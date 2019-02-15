@@ -49,20 +49,24 @@ import (
 )
 
 const (
-	CheckpointUrlBase 		string = "https://checkpoint-api.hashicorp.com"
-	ReleaseUrlBase          string = "https://releases.hashicorp.com"
-	VaultReleaseUrlBase		string = "https://releases.hashicorp.com/vault/"
+	// CheckpointURLBase is the URL base for CheckPoint API
+	CheckpointURLBase string = "https://checkpoint-api.hashicorp.com"
+	// ReleaseURLBase is the URL base for the HashiCorp releases website
+	ReleaseURLBase string = "https://releases.hashicorp.com"
+	// VaultReleaseURLBase is the URL base for the Vault releases page
+	VaultReleaseURLBase string = "https://releases.hashicorp.com/vault/"
 )
 
+// InstallMeta contains data for an installation candidate
 type InstallMeta struct {
-	BinaryArch           	string
-	BinaryName           	string
-	BinaryOS             	string
-	BinaryDesiredVersion 	string
-	BinaryLatestVersion  	string `json:"current_version"`
-	LogFile              	string
-	UserHome             	string
-	HvmHome     		        string
+	BinaryArch           string
+	BinaryName           string
+	BinaryOS             string
+	BinaryDesiredVersion string
+	BinaryLatestVersion  string `json:"current_version"`
+	LogFile              string
+	UserHome             string
+	HvmHome              string
 }
 
 var binaryVersion string
@@ -122,10 +126,10 @@ hvm can install the following utilities:
 		m.BinaryDesiredVersion = binaryVersion
 		m.BinaryOS = runtime.GOOS
 		m.BinaryName = strings.Join(args, " ")
-        if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-    		os.Mkdir(m.HvmHome, 0755)
+		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
+			os.Mkdir(m.HvmHome, 0755)
 		}
-		f, err := os.OpenFile(m.LogFile, os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0644)
+		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			fmt.Printf("Failed to open log file with error: %s", err)
 		}
@@ -165,9 +169,9 @@ func downloadData(m *InstallMeta, Url string) ([]byte, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		err := errors.New(response.Status)
-		logger.Error("install", "download data general error", err.Error())
-		return nil, err
+		zerr := errors.New(response.Status)
+		logger.Error("install", "download data general error", zerr.Error())
+		return nil, zerr
 	}
 	var downloadData bytes.Buffer
 	_, err = io.Copy(&downloadData, response.Body)
@@ -191,46 +195,46 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	// Some binary latest versions cannot be queried through the Checkpoint API.
 	// Those must unfortunately use an HTML scraping approach instead.
 	case "vault":
-		logger.Debug("install", "f-get-latest-version-html-scrape-url-base", VaultReleaseUrlBase)
+		logger.Debug("install", "f-get-latest-version-html-scrape-url-base", VaultReleaseURLBase)
 		logger.Debug("install", "f-get-latest-version-html-scrape-binary-name", binary)
 		var found bool
-	    resp, err := http.Get(VaultReleaseUrlBase)
-	    if err!=nil{
-	      return "", err
-	    }
-	    defer resp.Body.Close()
-	    z := html.NewTokenizer(bufio.NewReader(resp.Body))
-	    for found == false {
-	      tt := z.Next()
-	      switch tt {
-	      case html.ErrorToken:
-	          return "", err
-	      case html.StartTagToken:
-	          t := z.Token()
-	          switch t.Data {
-	          case "a":
-	              z.Next()
-	              t = z.Token()
-	              if t.Data != "../" {
-	                latestVersion := strings.TrimPrefix(t.Data, "vault_")
-	                m.BinaryLatestVersion = latestVersion
-	                found = true
-	                break
-	              }
-	          default:
-	            continue
-	          }
-	      }
-	    }
+		resp, err := http.Get(VaultReleaseURLBase)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		z := html.NewTokenizer(bufio.NewReader(resp.Body))
+		for found == false {
+			tt := z.Next()
+			switch tt {
+			case html.ErrorToken:
+				return "", err
+			case html.StartTagToken:
+				t := z.Token()
+				switch t.Data {
+				case "a":
+					z.Next()
+					t = z.Token()
+					if t.Data != "../" {
+						latestVersion := strings.TrimPrefix(t.Data, "vault_")
+						m.BinaryLatestVersion = latestVersion
+						found = true
+						break
+					}
+				default:
+					continue
+				}
+			}
+		}
 	case "consul", "nomad", "packer", "vagrant", "terraform":
-		logger.Debug("install", "f-get-latest-version-checkpoint-url-base", CheckpointUrlBase)
+		logger.Debug("install", "f-get-latest-version-checkpoint-url-base", CheckpointURLBase)
 		logger.Debug("install", "f-get-latest-version-checkpoint-binary-name", binary)
 
-		checkpointDataUrl := fmt.Sprintf("%s/v1/check/%s", CheckpointUrlBase, binary)
-		logger.Debug("install", "f-get-latest-version-checkpoint-data-url", checkpointDataUrl)
+		checkpointDataURL := fmt.Sprintf("%s/v1/check/%s", CheckpointURLBase, binary)
+		logger.Debug("install", "f-get-latest-version-checkpoint-data-url", checkpointDataURL)
 
 		checkPointClient := http.Client{Timeout: time.Second * 2}
-		req, err := http.NewRequest(http.MethodGet, checkpointDataUrl, nil)
+		req, err := http.NewRequest(http.MethodGet, checkpointDataURL, nil)
 		if err != nil {
 			logger.Error("install", "f-get-latest-version", "request-error", err.Error())
 			return "", err
@@ -272,7 +276,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 		} else {
 			// Eh oh, something is wrong!
 			logger.Error("install", "f-get-latest-version", "issue", "unexpected-checkpoint-api-value", m.BinaryLatestVersion)
-			err = errors.New("Problem determining latest binary version!")
+			err = errors.New("problem determining latest binary version")
 			return "", err
 		}
 		return m.BinaryLatestVersion, nil
@@ -297,8 +301,8 @@ func installBinary(m *InstallMeta) error {
 	logger.Debug("install", "f-install-binary", "start", "with-binary", m.BinaryName)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
-		logger.Error("install", "unknown-binary-candidate", "GURU DEDICATION!")
-		err = errors.New("install: unknown binary candidate. GURU DEDICATION!")
+		logger.Error("install", "unknown-binary-candidate", "GURU DEDICATION")
+		err = errors.New("install: unknown binary candidate. GURU DEDICATION")
 		return err
 	}
 	if m.BinaryDesiredVersion == "" {
@@ -315,7 +319,7 @@ func installBinary(m *InstallMeta) error {
 	logger.Info("install", "install binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
 
 	switch m.BinaryName {
-    case "consul", "nomad", "packer", "terraform", "vagrant", "vault":
+	case "consul", "nomad", "packer", "terraform", "vagrant", "vault":
 		targetPath := fmt.Sprintf("%s/.hvm/%s/%s", m.UserHome, m.BinaryName, m.BinaryDesiredVersion)
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 			if os.IsNotExist(err) {
@@ -329,9 +333,9 @@ func installBinary(m *InstallMeta) error {
 		// Store <binary>_<version>_SHA256SUMS file obtained from
 		// https://releases.hashicorp.com/<binary>/<version>/<binary>_<version>_SHA256SUMS
 		// in map for comparison
-		binaryShaUrl := fmt.Sprintf("%s/%s/%s/%s_%s_SHA256SUMS", ReleaseUrlBase, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName, m.BinaryDesiredVersion)
-		logger.Debug("install", "sha256sums-file-url", binaryShaUrl)
-		binarySha, err := downloadData(m, binaryShaUrl)
+		binaryShaURL := fmt.Sprintf("%s/%s/%s/%s_%s_SHA256SUMS", ReleaseURLBase, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName, m.BinaryDesiredVersion)
+		logger.Debug("install", "sha256sums-file-url", binaryShaURL)
+		binarySha, err := downloadData(m, binaryShaURL)
 		if err != nil {
 			logger.Error("install", "download-sha256sums-error", err)
 			return err
@@ -378,14 +382,14 @@ func installBinary(m *InstallMeta) error {
 			m.BinaryOS,
 			m.BinaryArch)
 		checkSha := fileSha[pkgFilename]
-		fullUrl := fmt.Sprintf("%s/%s/%s/%s?checksum=sha256:%s",
-			ReleaseUrlBase,
+		fullURL := fmt.Sprintf("%s/%s/%s/%s?checksum=sha256:%s",
+			ReleaseURLBase,
 			m.BinaryName,
 			m.BinaryDesiredVersion,
 			pkgFilename,
 			checkSha)
 		installPath := fmt.Sprintf("%s/%s", targetPath, m.BinaryName)
-		logger.Debug("install", "valid-binary", "true", "full-url", fullUrl, "install-path", installPath)
+		logger.Debug("install", "valid-binary", "true", "full-url", fullURL, "install-path", installPath)
 		// Get binary archive using go-getter from a URL which takes the form of:
 		// 'https://releases.hashicorp.com/<binary>/<version>/<binary>_<version>_<os>_<arch>.zip
 		// go-getter validates the intended download against its published SHA256 summary before downloading, or fails if the there is mismatch / other issue which prevents comparison.
@@ -397,9 +401,9 @@ func installBinary(m *InstallMeta) error {
 		s.Suffix = " Installing..."
 		s.FinalMSG = fmt.Sprintf("Installed %s (%s/%s) version %s\n", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion)
 		s.Start()
-		logger.Debug("install", "status", "go-getter", "download-url", fullUrl)
+		logger.Debug("install", "status", "go-getter", "download-url", fullURL)
 		logger.Debug("install", "status", "go-getter", "install-path", installPath)
-		if err := getter.GetFile(installPath, fullUrl); err != nil {
+		if err := getter.GetFile(installPath, fullURL); err != nil {
 			fmt.Printf("Download error with %q", err)
 			// If the SHA don't match or we hit any issue, then we ain't dancing!
 			logger.Error("install", "download-zip-error", err.Error())
