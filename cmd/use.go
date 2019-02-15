@@ -1,4 +1,4 @@
-// Copyright © 2018 Brian Shumate <brian@brianshumate.com>
+// Copyright © 2019 Brian Shumate <brian@brianshumate.com>
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -26,38 +26,118 @@
 package cmd
 
 import (
+    "bufio"
+    "errors"
 	"fmt"
+	"os"
+    "strings"
 
+	"github.com/mitchellh/go-homedir"
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 )
 
+type UseMeta struct {
+	BinaryArch           	string
+	BinaryName           	string
+	BinaryOS             	string
+	BinaryDesiredVersion 	string
+	LogFile              	string
+	UserHome             	string
+	HvmHome     		        string
+}
+
 // useCmd represents the use command
 var useCmd = &cobra.Command{
-	Use:   "use",
+	Use:   "use (<binary>) [--version <version>]",
 	Short: "Use a specific binary version",
 	Long: `
 Use the specified binary version; this is not
 accomplished with symbolic links and instead relies
 on copying the specified binary to the hvm binary
-directory which should be in the PATH.
-
-hvm use packer version 1.3.1
-`,
+directory which should be in the PATH.`,
+    Example: `
+    hvm use vault --version 1.0.2`,
+    ValidArgs: []string{"consul",
+		"consul-template",
+		"envconsul",
+		"nomad",
+		"packer",
+		"sentinel",
+		"terraform",
+		"vagrant",
+		"vault"},
+	// Using a custom args function here as workaround for GH-745
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return errors.New("use requires exactly 1 argument")
+		}
+		return cobra.OnlyValidArgs(cmd, args)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("FIXME: use called, but not yet implemented.")
+		// fmt.Println("FIXME: use called, but not yet implemented.")
+		m := UseMeta{}
+		userHome, err := homedir.Dir()
+		if err != nil {
+			fmt.Printf("Unable to determine user home directory; error: %s", err)
+			panic(err)
+		}
+		m.UserHome = userHome
+		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
+		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
+		m.BinaryDesiredVersion = binaryVersion
+		m.BinaryName = strings.Join(args, " ")
+        if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
+    		os.Mkdir(m.HvmHome, 0755)
+		}
+		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Failed to open log file with error: %s", err)
+			panic(err)
+		}
+		defer f.Close()
+		w := bufio.NewWriter(f)
+		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+        logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		err = useBinary(&m)
+		if err != nil {
+			fmt.Printf("Cannot use binary: %s\n", err)
+		}
 	},
 }
 
+// Initialize the command
 func init() {
 	rootCmd.AddCommand(useCmd)
+    useCmd.PersistentFlags().StringVar(&binaryVersion,
+		"version",
+		"",
+		"use binary version")
+}
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// useCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// useCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func useBinary(m *UseMeta) error {
+	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Failed to open log file with error: %s", err)
+		return err
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+	logger.Debug("use", "f-use-binary", "start", "with-binary", m.BinaryName)
+	if m.BinaryName == "" {
+		m.BinaryName = "none"
+		logger.Error("use", "unknown-binary-candidate", "GURU DEDICATION!")
+		err = errors.New("use: unknown binary candidate. GURU DEDICATION!")
+		return err
+	}
+	if m.BinaryDesiredVersion == "" {
+		logger.Debug("install", "f-use-binary", "blank-version", "binary", m.BinaryName)
+		err = errors.New("use: unknown binary candidate. GURU DEDICATION!")
+		return err
+	}
+	logger.Info("use", "use binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
+	fmt.Sprintf("Using binary: %s\n",  m.BinaryName)
+	fmt.Sprintf("Using version: %s\n",  m.BinaryDesiredVersion)
+	return nil
 }

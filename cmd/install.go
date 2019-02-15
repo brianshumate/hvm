@@ -1,4 +1,4 @@
-// Copyright © 2018 Brian Shumate <brian@brianshumate.com>
+// Copyright © 2019 Brian Shumate <brian@brianshumate.com>
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -73,17 +73,17 @@ var installCmd = &cobra.Command{
 	Short: "Install a supported binary at the latest available or specified version",
 	Long: `
 Install a supported binary binary at specified version for the host architecture
-and operating system; if version is omitted, the latest version will be
+and operating system; if version is omitted, the latest available version will be
 installed.
 
 hvm can install the following utilities:
 
 * consul
-* consul-template
-* envconsul
+* consul-template (WIP)
+* envconsul (WIP)
 * nomad
 * packer
-* sentinel
+* sentinel (WIP)
 * terraform
 * vagrant
 * vault
@@ -135,7 +135,7 @@ hvm can install the following utilities:
 		logger.Info("install", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
 		err = installBinary(&m)
 		if err != nil {
-			fmt.Printf("Cannot instal binary: %s\n", err)
+			fmt.Printf("Cannot install binary: %s\n", err)
 		}
 	},
 }
@@ -222,7 +222,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	          }
 	      }
 	    }
-	case "consul", "nomad", "packer":
+	case "consul", "nomad", "packer", "vagrant", "terraform":
 		logger.Debug("install", "f-get-latest-version-checkpoint-url-base", CheckpointUrlBase)
 		logger.Debug("install", "f-get-latest-version-checkpoint-binary-name", binary)
 
@@ -315,7 +315,7 @@ func installBinary(m *InstallMeta) error {
 	logger.Info("install", "install binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
 
 	switch m.BinaryName {
-    case "consul", "nomad", "packer", "vault":
+    case "consul", "nomad", "packer", "terraform", "vagrant", "vault":
 		targetPath := fmt.Sprintf("%s/.hvm/%s/%s", m.UserHome, m.BinaryName, m.BinaryDesiredVersion)
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 			if os.IsNotExist(err) {
@@ -391,8 +391,9 @@ func installBinary(m *InstallMeta) error {
 		// go-getter validates the intended download against its published SHA256 summary before downloading, or fails if the there is mismatch / other issue which prevents comparison.
 		// Shout out to Ye Olde School BSD spinner!
 		hvmSpinnerSet := []string{"/", "|", "\\", "-", "|", "\\", "-"}
-		s := spinner.New(hvmSpinnerSet, 74*time.Millisecond)
-		s.Color("", "bold", "fgCyan")
+		s := spinner.New(hvmSpinnerSet, 174*time.Millisecond)
+		s.Writer = os.Stderr
+		s.Color("fgHiCyan")
 		s.Suffix = " Installing..."
 		s.FinalMSG = fmt.Sprintf("Installed %s (%s/%s) version %s\n", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion)
 		s.Start()
