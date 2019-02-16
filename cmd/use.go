@@ -26,25 +26,26 @@
 package cmd
 
 import (
-    "bufio"
-    "errors"
+	"bufio"
+	"errors"
 	"fmt"
 	"os"
-    "strings"
+	"strings"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 )
 
+// UseMeta contains data for using a binary version
 type UseMeta struct {
-	BinaryArch           	string
-	BinaryName           	string
-	BinaryOS             	string
-	BinaryDesiredVersion 	string
-	LogFile              	string
-	UserHome             	string
-	HvmHome     		        string
+	BinaryArch           string
+	BinaryName           string
+	BinaryOS             string
+	BinaryDesiredVersion string
+	LogFile              string
+	UserHome             string
+	HvmHome              string
 }
 
 // useCmd represents the use command
@@ -56,9 +57,9 @@ Use the specified binary version; this is not
 accomplished with symbolic links and instead relies
 on copying the specified binary to the hvm binary
 directory which should be in the PATH.`,
-    Example: `
+	Example: `
     hvm use vault --version 1.0.2`,
-    ValidArgs: []string{"consul",
+	ValidArgs: []string{"consul",
 		"consul-template",
 		"envconsul",
 		"nomad",
@@ -87,8 +88,8 @@ directory which should be in the PATH.`,
 		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
 		m.BinaryDesiredVersion = binaryVersion
 		m.BinaryName = strings.Join(args, " ")
-        if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-    		os.Mkdir(m.HvmHome, 0755)
+		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
+			os.Mkdir(m.HvmHome, 0755)
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -98,7 +99,7 @@ directory which should be in the PATH.`,
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-        logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
 		err = useBinary(&m)
 		if err != nil {
 			fmt.Printf("Cannot use binary: %s\n", err)
@@ -109,7 +110,7 @@ directory which should be in the PATH.`,
 // Initialize the command
 func init() {
 	rootCmd.AddCommand(useCmd)
-    useCmd.PersistentFlags().StringVar(&binaryVersion,
+	useCmd.PersistentFlags().StringVar(&binaryVersion,
 		"version",
 		"",
 		"use binary version")
@@ -127,17 +128,17 @@ func useBinary(m *UseMeta) error {
 	logger.Debug("use", "f-use-binary", "start", "with-binary", m.BinaryName)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
-		logger.Error("use", "unknown-binary-candidate", "GURU DEDICATION!")
-		err = errors.New("use: unknown binary candidate. GURU DEDICATION!")
+		logger.Error("use", "unknown-binary-candidate", "🌀 GURU DEDICATION EMISSINGVERSION")
+		err = errors.New("use: unknown binary version; please use --version <version>")
 		return err
 	}
 	if m.BinaryDesiredVersion == "" {
 		logger.Debug("install", "f-use-binary", "blank-version", "binary", m.BinaryName)
-		err = errors.New("use: unknown binary candidate. GURU DEDICATION!")
+		err = errors.New("use: unknown binary version; please use --version <version>")
 		return err
 	}
 	logger.Info("use", "use binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
-	fmt.Sprintf("Using binary: %s\n",  m.BinaryName)
-	fmt.Sprintf("Using version: %s\n",  m.BinaryDesiredVersion)
+	fmt.Println("Using binary ", m.BinaryName)
+	fmt.Println("Using version ", m.BinaryDesiredVersion)
 	return nil
 }

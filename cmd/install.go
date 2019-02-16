@@ -301,8 +301,8 @@ func installBinary(m *InstallMeta) error {
 	logger.Debug("install", "f-install-binary", "start", "with-binary", m.BinaryName)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
-		logger.Error("install", "unknown-binary-candidate", "GURU DEDICATION")
-		err = errors.New("install: unknown binary candidate. GURU DEDICATION")
+		logger.Error("install", "unknown-binary-candidate", "🌀 GURU DEDICATION")
+		err = errors.New("install: unknown binary candidate. 🌀 GURU DEDICATION")
 		return err
 	}
 	if m.BinaryDesiredVersion == "" {
