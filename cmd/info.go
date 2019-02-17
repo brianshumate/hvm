@@ -103,7 +103,6 @@ popular CLI tools on supported platforms.`,
 		infoData := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
 		t := time.Now()
 		infoData["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
-        fmt.Sprintf("DEBUG: adding Consul version %s", m.CurrentConsulVersion)
 		if m.CurrentConsulVersion != "ENOVERSION" {
 			infoData["Consul version"] = m.CurrentConsulVersion
 		}

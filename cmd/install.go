@@ -258,8 +258,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 			logger.Error("install", "f-get-latest-version", "json-unmarshall-error", err.Error())
 			return "", err
 		}
-
-		// Ensure that we get some kind of valid version back from the API
+		// Ensure that we get something like a valid version back from the API
 		// and not for example, a maintenance page or similar...
 		checkpointLatestVersion, err := version.NewVersion(m.BinaryLatestVersion)
 		if err != nil {

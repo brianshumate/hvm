@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/hashicorp/go-hclog"
@@ -86,7 +87,9 @@ directory which should be in the PATH.`,
 		m.UserHome = userHome
 		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
+		m.BinaryArch = runtime.GOARCH
 		m.BinaryDesiredVersion = binaryVersion
+		m.BinaryOS = runtime.GOOS
 		m.BinaryName = strings.Join(args, " ")
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			os.Mkdir(m.HvmHome, 0755)
@@ -100,6 +103,11 @@ directory which should be in the PATH.`,
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		err = validateUseBinary(&m)
+		if err != nil {
+			fmt.Printf("Cannot use binary: %s\n", err)
+			os.Exit(1)
+		}
 		err = useBinary(&m)
 		if err != nil {
 			fmt.Printf("Cannot use binary: %s\n", err)
@@ -138,7 +146,45 @@ func useBinary(m *UseMeta) error {
 		return err
 	}
 	logger.Info("use", "use binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
-	fmt.Println("Using binary ", m.BinaryName)
-	fmt.Println("Using version ", m.BinaryDesiredVersion)
+	srcPath := fmt.Sprintf("%s/%s/%s/%s", m.HvmHome, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName)
+    destPath := fmt.Sprintf("%s/bin/%s", m.UserHome, m.BinaryName)
+    // Handle the binary symbolic link with jazz like hands...
+    if _, err := os.Lstat(destPath); err == nil {
+    	if err := os.Remove(destPath); err != nil {
+        	return fmt.Errorf("failed to unlink: %+v", err)
+    	}
+    } //else if os.IsNotExist(err) {
+      //	    return fmt.Errorf("failed to resolve symbolic link: %+v", err)
+      //	}
+    os.Symlink(srcPath, destPath)
+    if err != nil {
+      	logger.Error("install", "f-use-binary", "symlink", "error", err)
+      	return err
+    }
+    useMsg := fmt.Sprintf("Now using %s (%s/%s) version %s", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion)
+	fmt.Println(useMsg)
 	return nil
+}
+
+func validateUseBinary (m *UseMeta) error {
+	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Failed to open log file with error: %s", err)
+		return err
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+	logger.Debug("use", "f-validate-binary", "start", "with-binary", m.BinaryName)
+
+    // Check binary valid version
+
+	// Check binary existence
+	// XXX: This is rudimentary and probably needs refinement
+	binPath := fmt.Sprintf("%s/%s/%s/%s", m.HvmHome, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName)
+    _, err = os.Stat(binPath)
+    if os.IsNotExist(err) {
+        return fmt.Errorf("%s (%s/%s) version %s not installed. \nInstall with: hvm install %s --version %s", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion, m.BinaryName, m.BinaryDesiredVersion)
+    }
+    return nil
 }

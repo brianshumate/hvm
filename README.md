@@ -49,6 +49,14 @@ Installation of binaries includes a live download phase which is internally hand
 
 This provides the advantage that the SHA 256 summary is also compared between the Zip archive and what is posted on [releases.hashicorp.com](https://releases.hashicorp.com/) website for the binary in question, and download of the Zip archive occurs only if there is a match.
 
+Currently all `hvm` data, including downloaded binaries reside in the hard coded path:
+
+```
+$HOME/.hvm
+```
+
+This will eventually be configurable.
+
 #### use
 
 ## Build
