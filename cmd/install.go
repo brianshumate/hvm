@@ -48,7 +48,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// InstallMeta contains data for an installation candidate
+// InstallMeta contains data for a binary installation candidate
 type InstallMeta struct {
 	BinaryArch           string
 	BinaryName           string
@@ -96,7 +96,7 @@ hvm can install the following utilities:
 		"terraform",
 		"vagrant",
 		"vault"},
-	// Using a custom args function here as workaround for GH-745
+	// Using a custom Args function here as workaround for GH-745
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return errors.New("install requires exactly 1 argument")
@@ -128,21 +128,35 @@ hvm can install the following utilities:
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		logger.Info("install", "run", m.BinaryName, "desired version", m.BinaryDesiredVersion)
-		installedVersion, err := IsInstalledVersion(m.BinaryName, m.BinaryDesiredVersion)
-        if err != nil {
-            fmt.Println(fmt.Sprintf("failed to check installed version with error: %v; cowardly giving up!", err))
-            os.Exit(1)
-        }
-        if installedVersion == true {
-        	fmt.Println(m.BinaryName, "version", m.BinaryDesiredVersion, "appears to be already installed.")
-        } else {
+
+		// Validate binary attributes with helper functions
+		// Is desired binary version valid?
+		// XXX: TODO: finish helper for valid version
+
+		// Is desired binary already installed?
+		var installedVersion bool
+		installedVersion, err = IsInstalledVersion(m.BinaryName, m.BinaryDesiredVersion)
+		if err != nil {
+			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", m.BinaryName, err))
+			os.Exit(1)
+		}
+		if installedVersion == true {
+			if m.BinaryDesiredVersion == "" {
+				fmt.Println(fmt.Sprintf("latest %s version installed", m.BinaryName))
+				os.Exit(1)
+			} else {
+				fmt.Println(fmt.Sprintf("%s version %s appears to be already installed", m.BinaryName, m.BinaryDesiredVersion))
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("install", "run", m.BinaryName, "desired version", m.BinaryDesiredVersion)
 			err = installBinary(&m)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("cannot install", m.BinaryName, "version", m.BinaryDesiredVersion, "with error:", err))
+				fmt.Println(fmt.Sprintf("cannot install %s version %s with error: %v", m.BinaryName, m.BinaryDesiredVersion, err))
 				os.Exit(1)
 			}
 		}
+
 	},
 }
 
@@ -155,38 +169,41 @@ func init() {
 		"install binary version")
 }
 
-func downloadData(m *InstallMeta, Url string) ([]byte, error) {
+// fetch HTML data over HTTP
+func fetchData(m *InstallMeta, URL string) ([]byte, error) {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return nil, fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	response, err := http.Get(Url)
+	response, err := http.Get(URL)
 	if err != nil {
-		logger.Error("install", "download data response error", err.Error())
-		return nil, err
+		logger.Error("install", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		zerr := errors.New(response.Status)
-		logger.Error("install", "download data general error", zerr.Error())
-		return nil, zerr
+		err = errors.New(response.Status)
+		logger.Error("install", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
 	}
-	var downloadData bytes.Buffer
-	_, err = io.Copy(&downloadData, response.Body)
+	var fetchData bytes.Buffer
+	_, err = io.Copy(&fetchData, response.Body)
 	if err != nil {
-		logger.Error("install", "download data bytes buffer error", err.Error())
-		return nil, err
+		logger.Error("install", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with bytes buffer error: %v", err)
 	}
-	return downloadData.Bytes(), nil
+	return fetchData.Bytes(), nil
 }
 
+// getLatestVersion also tooooo complicated now
+// need to refactor stuff into helpers
 func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -195,7 +212,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	switch binary {
 	// Some binary latest versions cannot be queried through the Checkpoint API.
 	// Those must unfortunately use an HTML scraping approach instead.
-	case "vault":
+	case Vault:
 		logger.Debug("install", "f-get-latest-version-html-scrape-url-base", VaultReleaseURLBase)
 		logger.Debug("install", "f-get-latest-version-html-scrape-binary-name", binary)
 		var found bool
@@ -227,7 +244,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 				}
 			}
 		}
-	case "consul", "nomad", "packer", "vagrant", "terraform":
+	case Consul, Nomad, Packer, Vagrant, Terraform:
 		logger.Debug("install", "f-get-latest-version-checkpoint-url-base", CheckpointURLBase)
 		logger.Debug("install", "f-get-latest-version-checkpoint-binary-name", binary)
 
@@ -257,7 +274,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 		err = json.Unmarshal(body, &m)
 		if err != nil {
 			logger.Error("install", "f-get-latest-version", "json-unmarshall-error", err.Error())
-			return "", err
+			return "", fmt.Errorf("failed to unmarshal JSON with error: %v", err)
 		}
 		// Ensure that we get something like a valid version back from the API
 		// and not for example, a maintenance page or similar...
@@ -280,7 +297,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 		}
 		return m.BinaryLatestVersion, nil
 	default:
-		if m.BinaryName != "vault" {
+		if m.BinaryName != Vault {
 			logger.Warn("install", "binary", m.BinaryName, "unsupported-binary", "Binary not in CheckPoint API or otherwise not supported.")
 			return "", fmt.Errorf("Binary currently unsupported")
 		}
@@ -288,10 +305,12 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	return m.BinaryLatestVersion, nil
 }
 
+// installBinary has entirely too much going on in it right now!
+// some of this needs to go into the helpers
 func installBinary(m *InstallMeta) error {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -299,8 +318,8 @@ func installBinary(m *InstallMeta) error {
 	logger.Debug("install", "f-install-binary", "start", "with-binary", m.BinaryName)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
-		logger.Error("install", "unknown-binary-candidate", "🌀 GURU DEDICATION")
-		return fmt.Errorf("install: unknown binary candidate. 🌀 GURU DEDICATION")
+		logger.Error("install", "unknown-binary-candidate", "GURU DEDICATION")
+		return fmt.Errorf("install: unknown binary candidate. GURU DEDICATION")
 	}
 	if m.BinaryDesiredVersion == "" {
 		logger.Debug("install", "f-install-binary", "blank-version", "binary", m.BinaryName)
@@ -315,7 +334,7 @@ func installBinary(m *InstallMeta) error {
 	logger.Info("install", "install binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
 
 	switch m.BinaryName {
-	case "consul", "nomad", "packer", "terraform", "vagrant", "vault":
+	case Consul, Nomad, Packer, Terraform, Vagrant, Vault:
 		targetPath := fmt.Sprintf("%s/.hvm/%s/%s", m.UserHome, m.BinaryName, m.BinaryDesiredVersion)
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 			if os.IsNotExist(err) {
@@ -331,7 +350,7 @@ func installBinary(m *InstallMeta) error {
 		// in map for comparison
 		binaryShaURL := fmt.Sprintf("%s/%s/%s/%s_%s_SHA256SUMS", ReleaseURLBase, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName, m.BinaryDesiredVersion)
 		logger.Debug("install", "sha256sums-file-url", binaryShaURL)
-		binarySha, err := downloadData(m, binaryShaURL)
+		binarySha, err := fetchData(m, binaryShaURL)
 		if err != nil {
 			logger.Error("install", "download-sha256sums-error", err.Error())
 			return err
@@ -342,8 +361,8 @@ func installBinary(m *InstallMeta) error {
 		for scanner.Scan() {
 			s := strings.Fields(scanner.Text())
 			if len(s) == 2 {
-				if m.BinaryName == "nomad" {
-					logger.Debug("install", "stage", "scanner", "binary", "nomad")
+				if m.BinaryName == Nomad {
+					logger.Debug("install", "stage", "scanner", "binary", Nomad)
 					nomadLatestVersion, err := version.NewVersion(m.BinaryDesiredVersion)
 					if err != nil {
 						logger.Error("install", "issue", "Could not determine Nomad comparison version!", "error", err.Error())

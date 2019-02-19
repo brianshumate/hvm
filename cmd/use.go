@@ -82,7 +82,7 @@ directory which should be in the PATH.`,
 		if err != nil {
 			fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
 			os.Exit(1)
-        }
+		}
 		m.UserHome = userHome
 		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
@@ -103,24 +103,6 @@ directory which should be in the PATH.`,
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
 
-        // Validate binary attributes with helper functions
-
-        // Is binary already installed?
-        var installedV bool
-		installedV, err = IsInstalledVersion(m.BinaryName, m.BinaryDesiredVersion)
-		if err != nil {
-			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", m.BinaryName, err))
-			os.Exit(1)
-		}
-        if installedV == true {
-        	if m.BinaryDesiredVersion == "" {
-        		fmt.Println(fmt.Sprintf("latest %s version installed", m.BinaryName))
-        		os.Exit(1)
-        		} else {
-        			fmt.Println(fmt.Sprintf("%s version %s appears to be already installed", m.BinaryName, m.BinaryDesiredVersion))
-        			os.Exit(1)
-        		}
-        }
 		err = useBinary(&m)
 		if err != nil {
 			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", m.BinaryName, err))
@@ -142,8 +124,7 @@ func init() {
 func useBinary(m *UseMeta) error {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Errorf("failed to open log file with error: %v", err)
-		return err
+		return fmt.Errorf("failed to open log file with error: %v", err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -160,23 +141,23 @@ func useBinary(m *UseMeta) error {
 	}
 	logger.Info("use", "use binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
 	srcPath := fmt.Sprintf("%s/%s/%s/%s", m.HvmHome, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName)
-    destPath := fmt.Sprintf("%s/bin/%s", m.UserHome, m.BinaryName)
+	destPath := fmt.Sprintf("%s/bin/%s", m.UserHome, m.BinaryName)
 
-    // Handle the binary symbolic link with jazz-like hands...
-    if _, err := os.Lstat(destPath); err == nil {
-    	if err := os.Remove(destPath); err != nil {
-        	return fmt.Errorf("failed to unlink %s with error: %+v", destPath, err)
-    	}
-    }
-      // XXX: yarrr
-      // else if os.IsNotExist(err) {
-      //     return fmt.Errorf("failed to resolve symbolic link: %+v", err)
-      // }
-    os.Symlink(srcPath, destPath)
-    if err != nil {
-      	logger.Error("install", "f-use-binary", "symlink", "error", err)
-      	return err
-    }
-    fmt.Println(fmt.Sprintf("Now using %s (%s/%s) version %s", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion))
+	// Handle the binary symbolic link with jazz-like hands...
+	if _, err = os.Lstat(destPath); err == nil {
+		if err = os.Remove(destPath); err != nil {
+			return fmt.Errorf("failed to unlink %s with error: %+v", destPath, err)
+		}
+	}
+	// XXX: yarrr
+	// else if os.IsNotExist(err) {
+	//     return fmt.Errorf("failed to resolve symbolic link: %+v", err)
+	// }
+	os.Symlink(srcPath, destPath)
+	if err != nil {
+		logger.Error("install", "f-use-binary", "symlink", "error", err)
+		return err
+	}
+	fmt.Println(fmt.Sprintf("Now using %s (%s/%s) version %s", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion))
 	return nil
 }
