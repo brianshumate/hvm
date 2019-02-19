@@ -76,16 +76,15 @@ popular CLI tools on supported platforms.`,
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Printf("Failed to open log file with error: %s", err)
-			panic(err)
+			fmt.Println(fmt.Sprintf("failed to open log file with error: %v", err))
+			os.Exit(1)
 		}
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		hostName, err := os.Hostname()
 		if err != nil {
-			logger.Error("info", "Cannot determine hostname!")
-		    panic(err)
+			logger.Error("info", "Cannot determine hostname", "error:", err.Error())
 		}
 		m.HostName = hostName
 		consulV, err := checkHashiVersion(&m, "consul")
@@ -93,13 +92,11 @@ popular CLI tools on supported platforms.`,
  			logger.Error("info", "cannot determine version", "consul", "error", err.Error() )
 		}
 		m.CurrentConsulVersion = consulV
-
 		vaultV, err := checkHashiVersion(&m, "vault")
 		if err != nil {
  			logger.Error("info", "cannot determine version", "vault", "error", err.Error() )
 		}
 		m.CurrentVaultVersion = vaultV
-
 		infoData := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
 		t := time.Now()
 		infoData["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
@@ -121,16 +118,6 @@ popular CLI tools on supported platforms.`,
 
 func init() {
 	rootCmd.AddCommand(infoCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// infoCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// infoCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // checkHashiVersion attempts to locate the tools and get their versions -
@@ -138,8 +125,7 @@ func init() {
 func checkHashiVersion(m *InfoMeta, name string) (string, error) {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Failed to open log file with error: %s", err)
-		panic(err)
+		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)

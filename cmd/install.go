@@ -48,15 +48,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	// CheckpointURLBase is the URL base for CheckPoint API
-	CheckpointURLBase string = "https://checkpoint-api.hashicorp.com"
-	// ReleaseURLBase is the URL base for the HashiCorp releases website
-	ReleaseURLBase string = "https://releases.hashicorp.com"
-	// VaultReleaseURLBase is the URL base for the Vault releases page
-	VaultReleaseURLBase string = "https://releases.hashicorp.com/vault/"
-)
-
 // InstallMeta contains data for an installation candidate
 type InstallMeta struct {
 	BinaryArch           string
@@ -116,7 +107,7 @@ hvm can install the following utilities:
 		m := InstallMeta{}
 		userHome, err := homedir.Dir()
 		if err != nil {
-			fmt.Printf("Unable to determine user home directory; error: %s", err)
+			fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
 			os.Exit(1)
 		}
 		m.UserHome = userHome
@@ -131,15 +122,26 @@ hvm can install the following utilities:
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Printf("Failed to open log file with error: %s", err)
+			fmt.Println(fmt.Sprintf("failed to open log file %s with error: %v", m.LogFile, err))
+			os.Exit(1)
 		}
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		logger.Info("install", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
-		err = installBinary(&m)
-		if err != nil {
-			fmt.Printf("Cannot install binary: %s\n", err)
+		logger.Info("install", "run", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		installedVersion, err := IsInstalledVersion(m.BinaryName, m.BinaryDesiredVersion)
+        if err != nil {
+            fmt.Println(fmt.Sprintf("failed to check installed version with error: %v; cowardly giving up!", err))
+            os.Exit(1)
+        }
+        if installedVersion == true {
+        	fmt.Println(m.BinaryName, "version", m.BinaryDesiredVersion, "appears to be already installed.")
+        } else {
+			err = installBinary(&m)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("cannot install", m.BinaryName, "version", m.BinaryDesiredVersion, "with error:", err))
+				os.Exit(1)
+			}
 		}
 	},
 }
@@ -156,8 +158,7 @@ func init() {
 func downloadData(m *InstallMeta, Url string) ([]byte, error) {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Failed to open log file with error: %s", err)
-		return nil, err
+		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -185,7 +186,7 @@ func downloadData(m *InstallMeta, Url string) ([]byte, error) {
 func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Failed to open log file with error: %s", err.Error())
+		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -275,14 +276,13 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 		} else {
 			// Eh oh, something is wrong!
 			logger.Error("install", "f-get-latest-version", "issue", "unexpected-checkpoint-api-value", m.BinaryLatestVersion)
-			err = errors.New("problem determining latest binary version")
-			return "", err
+			return "", fmt.Errorf("problem determining latest binary version")
 		}
 		return m.BinaryLatestVersion, nil
 	default:
 		if m.BinaryName != "vault" {
 			logger.Warn("install", "binary", m.BinaryName, "unsupported-binary", "Binary not in CheckPoint API or otherwise not supported.")
-			return "", errors.New("Binary currently unsupported")
+			return "", fmt.Errorf("Binary currently unsupported")
 		}
 	}
 	return m.BinaryLatestVersion, nil
@@ -291,8 +291,7 @@ func getLatestVersion(binary string, m *InstallMeta) (string, error) {
 func installBinary(m *InstallMeta) error {
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Failed to open log file with error: %s", err)
-		return err
+		fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -301,8 +300,7 @@ func installBinary(m *InstallMeta) error {
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
 		logger.Error("install", "unknown-binary-candidate", "🌀 GURU DEDICATION")
-		err = errors.New("install: unknown binary candidate. 🌀 GURU DEDICATION")
-		return err
+		return fmt.Errorf("install: unknown binary candidate. 🌀 GURU DEDICATION")
 	}
 	if m.BinaryDesiredVersion == "" {
 		logger.Debug("install", "f-install-binary", "blank-version", "binary", m.BinaryName)
@@ -310,7 +308,6 @@ func installBinary(m *InstallMeta) error {
 		if err != nil {
 			logger.Error("install", "get-latest-version-fail", "error", err.Error())
 			return err
-			// panic(err)
 		}
 		logger.Debug("install", "get-latest-version", "inner", "got-version", latestBinaryVersion)
 		m.BinaryDesiredVersion = latestBinaryVersion
@@ -324,8 +321,8 @@ func installBinary(m *InstallMeta) error {
 			if os.IsNotExist(err) {
 				err := os.MkdirAll(targetPath, 0770)
 				if err != nil {
-					logger.Error("install", "directory-creation-error", err)
-					return err
+					logger.Error("install", "directory-creation-error", err.Error())
+					return fmt.Errorf("directory creation error: %v", err)
 				}
 			}
 		}
@@ -336,7 +333,7 @@ func installBinary(m *InstallMeta) error {
 		logger.Debug("install", "sha256sums-file-url", binaryShaURL)
 		binarySha, err := downloadData(m, binaryShaURL)
 		if err != nil {
-			logger.Error("install", "download-sha256sums-error", err)
+			logger.Error("install", "download-sha256sums-error", err.Error())
 			return err
 		}
 		shaStream := bytes.NewReader(binarySha)
@@ -413,7 +410,6 @@ func installBinary(m *InstallMeta) error {
 		return nil
 	default:
 		logger.Warn("install", "binary", m.BinaryName, "unsupported-binary", "not in CheckPoint API")
-		err := errors.New("Binary currently unsupported")
-		return err
+		return errors.New("Binary currently unsupported")
 	}
 }
