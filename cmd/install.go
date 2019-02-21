@@ -64,7 +64,7 @@ var binaryVersion string
 
 // installCmd represents the install command
 var installCmd = &cobra.Command{
-	Use:   "install (<binary>) [--version <version>]",
+	Use:   "install (<binary>) [<version>]",
 	Short: "Install a supported binary at the latest available or specified version",
 	Long: `
 Install a supported binary binary at specified version for the host architecture
@@ -86,21 +86,27 @@ hvm can install the following utilities:
 	Example: `
   hvm install vault
 
-  hvm install nomad --version 0.8.5`,
-	ValidArgs: []string{"consul",
-		"consul-template",
-		"envconsul",
-		"nomad",
-		"packer",
-		"sentinel",
-		"terraform",
-		"vagrant",
-		"vault"},
+  hvm install consul 1.4.2`,
 	// Using a custom Args function here as workaround for GH-745
 	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("install requires exactly 1 argument")
+		if len(args)  < 1 {
+		  return errors.New("install requires exactly 1 argument")
 		}
+        if args[1] != "" {
+        	fmt.Println("DEBUG: Got binary:", args[0], "version:", args[1])
+        	binary := args[0]
+        	version := args[1]
+			v, err := ValidateVersion(binary, version)
+            fmt.Println("DEBUG got valid:", v)
+        	if err != nil {
+        		fmt.Println("cannot validate binary or version")
+        		os.Exit(1)
+        	}
+        	if v == false {
+				// return fmt.Errorf("%s is not a version of %s that can be installed", args[1], args[0])
+				fmt.Println(fmt.Printf("DEBUG: CLAIMS: %s is not a version of %s that can be installed", args[1], args[0]))
+        	}
+        }
 		return cobra.OnlyValidArgs(cmd, args)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -114,9 +120,15 @@ hvm can install the following utilities:
 		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 		m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 		m.BinaryArch = runtime.GOARCH
-		m.BinaryDesiredVersion = binaryVersion
+		// m.BinaryDesiredVersion = binaryVersion
+		if args[1] == "" {
+            m.BinaryDesiredVersion = "latest"
+			} else {
+				m.BinaryDesiredVersion = args[1]
+		    }
 		m.BinaryOS = runtime.GOOS
-		m.BinaryName = strings.Join(args, " ")
+		// m.BinaryName = strings.Join(args, " ")
+		m.BinaryName = args[0]
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			os.Mkdir(m.HvmHome, 0755)
 		}
@@ -163,10 +175,10 @@ hvm can install the following utilities:
 // Initialize the command
 func init() {
 	rootCmd.AddCommand(installCmd)
-	installCmd.PersistentFlags().StringVar(&binaryVersion,
-		"version",
-		"",
-		"install binary version")
+	// installCmd.PersistentFlags().StringVar(&binaryVersion,
+	//	"version",
+	//	"",
+	//	"install binary version")
 }
 
 // fetch HTML data over HTTP
@@ -321,7 +333,7 @@ func installBinary(m *InstallMeta) error {
 		logger.Error("install", "unknown-binary-candidate", "GURU DEDICATION")
 		return fmt.Errorf("install: unknown binary candidate. GURU DEDICATION")
 	}
-	if m.BinaryDesiredVersion == "" {
+	if m.BinaryDesiredVersion == "latest" {
 		logger.Debug("install", "f-install-binary", "blank-version", "binary", m.BinaryName)
 		latestBinaryVersion, err := getLatestVersion(m.BinaryName, m)
 		if err != nil {

@@ -27,11 +27,10 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
-	// "strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -41,14 +40,18 @@ import (
 )
 
 type InfoMeta struct {
-	CurrentConsulVersion string
-	CurrentVaultVersion  string
-	HostArch             string
-	HostName             string
-	HostOS               string
-	HvmHome              string
-	LogFile              string
-	UserHome             string
+	CurrentConsulVersion    string
+	CurrentNomadVersion     string
+	CurrentPackerVersion    string
+	CurrentTerraformVersion string
+	CurrentVagrantVersion   string
+	CurrentVaultVersion     string
+	HostArch                string
+	HostName                string
+	HostOS                  string
+	HvmHome                 string
+	LogFile                 string
+	UserHome                string
 }
 
 // infoCmd represents the info command
@@ -59,12 +62,18 @@ var infoCmd = &cobra.Command{
 but is also quite real; it is not associated with HashiCorp in any official
 capacity whatsoever, but allows you to manage multiple installations of their
 popular CLI tools on supported platforms.`,
+    Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			return errors.New("arguments to info are not allowed")
+		}
+		return cobra.OnlyValidArgs(cmd, args)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		m := InfoMeta{}
 		userHome, err := homedir.Dir()
 		if err != nil {
-			fmt.Printf("Unable to determine user home directory; error: %s", err)
-			panic(err)
+			fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
+			os.Exit(1)
 		}
 		m.UserHome = userHome
 		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
@@ -84,26 +93,75 @@ popular CLI tools on supported platforms.`,
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		hostName, err := os.Hostname()
 		if err != nil {
-			logger.Error("info", "Cannot determine hostname", "error:", err.Error())
+			logger.Error("info", "cannot determine hostname with error", err.Error())
 		}
 		m.HostName = hostName
-		consulV, err := checkHashiVersion(&m, "consul")
+
+		consulV, err := CheckActiveVersion(Consul)
 		if err != nil {
-			logger.Error("info", "cannot determine version", "consul", "error", err.Error())
+			logger.Error("info", "cannot determine active Consul version with error", err.Error())
+			m.CurrentConsulVersion = ""
 		}
 		m.CurrentConsulVersion = consulV
-		vaultV, err := checkHashiVersion(&m, "vault")
+
+		nomadV, err := CheckActiveVersion(Nomad)
 		if err != nil {
-			logger.Error("info", "cannot determine version", "vault", "error", err.Error())
+			logger.Error("info", "cannot determine active Nomad version with error", err.Error())
+			m.CurrentNomadVersion = ""
+		}
+		m.CurrentNomadVersion = nomadV
+
+		packerV, err := CheckActiveVersion(Packer)
+		if err != nil {
+			logger.Error("info", "cannot determine active Packer version with error", err.Error())
+			m.CurrentPackerVersion = ""
+		}
+		m.CurrentPackerVersion = packerV
+
+		terraformV, err := CheckActiveVersion(Terraform)
+		if err != nil {
+			logger.Error("info", "cannot determine active Terraform version with error", err.Error())
+			m.CurrentTerraformVersion = ""
+		}
+		m.CurrentTerraformVersion = terraformV
+
+        // Problem with vagrant binary in Linux container on ChromeOS due to FUSE / AppImage issue
+        // so if we learn that CROS is present, we skip checking Vagrant version since it cannot be determined
+        if _, err := os.Stat("/dev/.cros_milestone"); os.IsNotExist(err) {
+			vagrantV, err := CheckActiveVersion(Vagrant)
+			if err != nil {
+				logger.Error("info", "cannot determine active Vagrant version with error", err.Error())
+				m.CurrentVagrantVersion = ""
+			}
+			m.CurrentVagrantVersion = vagrantV
+		} else {
+			m.CurrentVagrantVersion = ""
+		}
+		vaultV, err := CheckActiveVersion(Vault)
+		if err != nil {
+			logger.Error("info", "cannot determine active Vault version with error", err.Error())
+			m.CurrentVaultVersion = ""
 		}
 		m.CurrentVaultVersion = vaultV
 		infoData := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
 		t := time.Now()
 		infoData["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
-		if m.CurrentConsulVersion != "ENOVERSION" {
+		if m.CurrentConsulVersion != "" {
 			infoData["Consul version"] = m.CurrentConsulVersion
 		}
-		if m.CurrentVaultVersion != "ENOVERSION" {
+		if m.CurrentNomadVersion != "" {
+			infoData["Nomad version"] = m.CurrentNomadVersion
+		}
+		if m.CurrentPackerVersion != "" {
+			infoData["Packer version"] = m.CurrentPackerVersion
+		}
+		if m.CurrentTerraformVersion != "" {
+			infoData["Terraform version"] = m.CurrentTerraformVersion
+		}
+		if m.CurrentVagrantVersion != "" {
+			infoData["Vagrant version"] = m.CurrentVagrantVersion
+		}
+		if m.CurrentVaultVersion != "" {
 			infoData["Vault version"] = m.CurrentVaultVersion
 		}
 		columns := []string{}
@@ -111,45 +169,11 @@ popular CLI tools on supported platforms.`,
 			columns = append(columns, fmt.Sprintf("%s: | %s ", k, v))
 		}
 		data := columnize.SimpleFormat(columns)
-		fmt.Println("Basic system factoids:")
+		fmt.Println("Basic local system factoids:\n")
 		fmt.Printf("%s\n", data)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(infoCmd)
-}
-
-// checkHashiVersion attempts to locate the tools and get their versions -
-// Consul has slightly different version output style so it must be handled differently
-func checkHashiVersion(m *InfoMeta, name string) (string, error) {
-	var version []byte
-	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	path, err := exec.LookPath(name)
-	if err != nil {
-		logger.Error("info", "error detecting binary on PATH", name, "error", err.Error())
-		return "", err
-	}
-	if name == "consul" {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}'", path)).Output()
-		if err != nil {
-			logger.Error("info", "error executing binary", name, "error", err.Error())
-			return "", err
-		}
-		return string(version), nil
-	} else if name == "nomad" || name == "vault" {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", path)).Output()
-		if err != nil {
-			logger.Error("info", "error executing binary", name, "error", err.Error())
-			return "", err
-		}
-		return string(version), nil
-	}
-	return "", err
 }

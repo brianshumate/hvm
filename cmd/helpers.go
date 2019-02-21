@@ -31,14 +31,14 @@ import (
 	// "encoding/json"
 	// "errors"
 	"fmt"
-	// "golang.org/x/net/html"
+	"golang.org/x/net/html"
 	// "io"
 	// "io/ioutil"
-	// "net/http"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
-	// "strings"
+	"strings"
 	// "time"
 
 	"github.com/hashicorp/go-hclog"
@@ -95,9 +95,9 @@ type HelpersMeta struct {
 	HvmHome             string
 }
 
-// CheckHashiVersion attempts to locate binary tools and get their current versions using OS calls
-// Consul has slightly different version output style so it must be handled differently
-func CheckHashiVersion(checkBinary string) (string, error) {
+// CheckHashiVersion tries to locate binary tools in the system path and get their version using OS calls
+// Consul has slightly different version output style from others so it must be handled differently
+func CheckActiveVersion(checkBinary string) (string, error) {
 	installedVersion := ""
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
@@ -130,7 +130,7 @@ func CheckHashiVersion(checkBinary string) (string, error) {
 			return "", err
 		}
 		return string(version), nil
-	} else if checkBinary == Nomad || checkBinary == Vault {
+	} else {
 		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", path)).Output()
 		if err != nil {
 			logger.Error("info", "error executing binary", checkBinary, "error", err.Error())
@@ -186,8 +186,9 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 	return installedVersion, nil
 }
 
-// IsValidVersion determines if 	a given version is contained in the list from GetAllVersions
-func IsValidVersion(checkBinary string, checkVersion string) (bool, error) {
+// ValidateVersion accepts a binary name and proposed version number and validates it
+// against all versions returned from releases.hashicorp.com returning true if valid
+func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error) {
 	validVersion := false
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
@@ -198,7 +199,7 @@ func IsValidVersion(checkBinary string, checkVersion string) (bool, error) {
 	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 	m.BinaryArch = runtime.GOARCH
-	m.BinaryCheckVersion = checkVersion
+	m.BinaryCheckVersion = checkBinaryVersion
 	m.BinaryOS = runtime.GOOS
 	m.BinaryName = checkBinary
 	if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
@@ -211,6 +212,51 @@ func IsValidVersion(checkBinary string, checkVersion string) (bool, error) {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	logger.Debug("helper", "isvalidversion", m.BinaryName, "check version", m.BinaryCheckVersion)
-	return validVersion, nil
+	logger.Debug("helper", "validateversion", m.BinaryName, "check version", m.BinaryCheckVersion)
+    binaryVersions := []string{}
+    var foundVersions bool
+    resp, err := http.Get(fmt.Sprintf("%s/%s", CheckpointURLBase, m.BinaryName))
+    if err!=nil{
+      logger.Error("helper", "failed to open validateversion url with error", err.Error())
+      return validVersion, fmt.Errorf("failed to get url with error: %v", err)
+    }
+    defer resp.Body.Close()
+    z := html.NewTokenizer(bufio.NewReader(resp.Body))
+    for foundVersions == false {
+      tt := z.Next()
+      switch tt {
+      case html.ErrorToken:
+          return false, nil
+      case html.StartTagToken:
+          t := z.Token()
+          switch t.Data {
+          case "a":
+              z.Next()
+              t = z.Token()
+              version := strings.TrimPrefix(t.Data, fmt.Sprintf("%s_", checkBinary))
+              // strip "../" from inclusion into the slice
+              if version == "../" {
+                continue
+              }
+              binaryVersions = append(binaryVersions, version)
+              if version == "0.1.0" {
+              	// we are at the bottom of the versions list now
+                foundVersions = true
+                break
+              }
+          }
+          default:
+            continue
+       }
+    }
+    fmt.Println("DEBUG: binary versions:", binaryVersions)
+    logger.Info("helper", "binaryversions", binaryVersions)
+
+    // we have relatively small slices, so...
+    for _, n := range binaryVersions {
+        if checkBinaryVersion == n {
+            return true, nil
+        }
+    }
+    return false, nil
 }

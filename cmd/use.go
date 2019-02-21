@@ -101,7 +101,7 @@ directory which should be in the PATH.`,
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		logger.Info("use", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
 
 		err = useBinary(&m)
 		if err != nil {
@@ -129,34 +129,36 @@ func useBinary(m *UseMeta) error {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	logger.Debug("use", "f-use-binary", "start", "with-binary", m.BinaryName)
+	logger.Debug("use", "f-use-binary", m.BinaryName)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
 		logger.Error("use", "unknown-binary-candidate", "GURU DEDICATION EMISSINGVERSION")
 		return fmt.Errorf("use: unknown binary; please specify binary name as first argument")
 	}
 	if m.BinaryDesiredVersion == "" {
-		logger.Debug("install", "f-use-binary", "blank-version", "binary", m.BinaryName)
+		logger.Debug("install", "f-use-binary blank-version", m.BinaryName)
 		return fmt.Errorf("use: unknown binary version; please specify version with '--version' flag")
 	}
-	logger.Info("use", "use binary candidate", "final", "binary", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
+	logger.Info("use", "use binary candidate", m.BinaryName, "desired-version", m.BinaryDesiredVersion)
 	srcPath := fmt.Sprintf("%s/%s/%s/%s", m.HvmHome, m.BinaryName, m.BinaryDesiredVersion, m.BinaryName)
 	destPath := fmt.Sprintf("%s/bin/%s", m.UserHome, m.BinaryName)
-
-	// Handle the binary symbolic link with jazz-like hands...
+	// Handle the binary symbolic link with quasi-somber jazz-like hands...
 	if _, err = os.Lstat(destPath); err == nil {
 		if err = os.Remove(destPath); err != nil {
 			return fmt.Errorf("failed to unlink %s with error: %+v", destPath, err)
 		}
-	}
-	// XXX: yarrr
-	// else if os.IsNotExist(err) {
-	//     return fmt.Errorf("failed to resolve symbolic link: %+v", err)
-	// }
+	}   else if os.IsNotExist(err) {
+	        logger.Error("install", "f-use-binary", "symlink", "error", err.Error())
+	    }
 	os.Symlink(srcPath, destPath)
 	if err != nil {
-		logger.Error("install", "f-use-binary", "symlink", "error", err)
-		return err
+		// XXX: racy / for some reason if the symlink has never existed
+		// the first attempt to link can fail, so immediately try once more... -_-
+		os.Symlink(srcPath, destPath)
+		if err != nil {
+			logger.Error("install", "f-use-binary", "symlink", "error", err.Error())
+			return err
+		}
 	}
 	fmt.Println(fmt.Sprintf("Now using %s (%s/%s) version %s", m.BinaryName, m.BinaryOS, m.BinaryArch, m.BinaryDesiredVersion))
 	return nil
