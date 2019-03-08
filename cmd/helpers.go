@@ -27,22 +27,22 @@ package cmd
 
 import (
 	"bufio"
-	// "bytes"
-	// "encoding/json"
-	// "errors"
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"golang.org/x/net/html"
-	// "io"
-	// "io/ioutil"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
-	// "time"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
-	// "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 )
 
@@ -141,13 +141,158 @@ func CheckActiveVersion(checkBinary string) (string, error) {
 	return "", err
 }
 
-// GetAllVersions grabs a list of all valid versions of an open source HashiTool from the releases website
-func GetAllVersions(checkBinary string) (string, error) {
-	allVersions := "wow"
-	return allVersions, nil
+// FetchData grabs bits of HTML data over HTTP
+func FetchData(URL string) ([]byte, error) {
+	m := HelpersMeta{}
+	userHome, err := homedir.Dir()
+	if err != nil {
+		return nil, fmt.Errorf("Unable to determine user home directory; error: %v", err)
+	}
+	m.UserHome = userHome
+	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
+	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
+	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+	response, err := http.Get(URL)
+	if err != nil {
+		logger.Error("helper", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		err = errors.New(response.Status)
+		logger.Error("helper", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
+	}
+	var fetchData bytes.Buffer
+	_, err = io.Copy(&fetchData, response.Body)
+	if err != nil {
+		logger.Error("helper", "fetch data error", err.Error())
+		return nil, fmt.Errorf("failed to fetch data with bytes buffer error: %v", err)
+	}
+	return fetchData.Bytes(), nil
 }
 
-// IsInstalledVersion determines if a given version is already installed
+// GetLatestVersion returns the latest version of a binary
+func GetLatestVersion(binary string) (string, error) {
+	m := HelpersMeta{}
+	userHome, err := homedir.Dir()
+	if err != nil {
+		return "", fmt.Errorf("Unable to determine user home directory; error: %v", err)
+	}
+	m.UserHome = userHome
+	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
+	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
+	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+	logger.Debug("helper", "f-get-latest-version", binary)
+	switch binary {
+	// Some binary latest versions cannot be queried through the Checkpoint API.
+	// Those must unfortunately use an HTML scraping approach instead.
+	case Vault:
+		logger.Debug("helper", "f-get-latest-version-html-scrape-url-base", VaultReleaseURLBase)
+		logger.Debug("helper", "f-get-latest-version-html-scrape-binary-name", binary)
+		var found bool
+		resp, err := http.Get(VaultReleaseURLBase)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		z := html.NewTokenizer(bufio.NewReader(resp.Body))
+		for found == false {
+			tt := z.Next()
+			switch tt {
+			case html.ErrorToken:
+				return "", err
+			case html.StartTagToken:
+				t := z.Token()
+				switch t.Data {
+				case "a":
+					z.Next()
+					t = z.Token()
+					if t.Data != "../" {
+						latestVersion := strings.TrimPrefix(t.Data, "vault_")
+						m.BinaryLatestVersion = latestVersion
+						found = true
+						break
+					}
+				default:
+					continue
+				}
+			}
+		}
+	case Consul, Nomad, Packer, Vagrant, Terraform:
+		logger.Debug("helper", "f-get-latest-version-checkpoint-url-base", CheckpointURLBase)
+		logger.Debug("helper", "f-get-latest-version-checkpoint-binary-name", binary)
+
+		checkpointDataURL := fmt.Sprintf("%s/v1/check/%s", CheckpointURLBase, binary)
+		logger.Debug("helper", "f-get-latest-version-checkpoint-data-url", checkpointDataURL)
+
+		checkPointClient := http.Client{Timeout: time.Second * 2}
+		req, err := http.NewRequest(http.MethodGet, checkpointDataURL, nil)
+		if err != nil {
+			logger.Error("helper", "f-get-latest-version", "request-error", err.Error())
+			return "", err
+		}
+
+		req.Header.Set("User-Agent", "hvm-oss-http-client")
+		res, err := checkPointClient.Do(req)
+		if err != nil {
+			logger.Error("helper", "f-get-latest-version", "get-error", err.Error())
+			return "", err
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			logger.Error("helper", "f-get-latest-version", "read-body-error", err.Error())
+			return "", err
+		}
+
+		err = json.Unmarshal(body, &m)
+		if err != nil {
+			logger.Error("helper", "f-get-latest-version", "json-unmarshall-error", err.Error())
+			return "", fmt.Errorf("failed to unmarshal JSON with error: %v", err)
+		}
+		// Ensure that we get something like a valid version back from the API
+		// and not a maintenance page or similar...
+		checkpointLatestVersion, err := version.NewVersion(m.BinaryLatestVersion)
+		if err != nil {
+			logger.Error("helper", "issue", "Could not determine comparison version!", "error", err.Error())
+			return "", err
+		}
+		constraints, err := version.NewConstraint(">= 0.0.1")
+		if err != nil {
+			logger.Error("helper", "f-get-latest-version", "issue", "Could not determine comparison constraints!", "error", err.Error())
+			return "", err
+		}
+		if constraints.Check(checkpointLatestVersion) {
+			logger.Debug("helper", "f-get-latest-version", "chcked-version", "version", checkpointLatestVersion, "constraints", constraints)
+		} else {
+			// Eh oh, something is wrong!
+			logger.Error("helper", "f-get-latest-version", "issue", "unexpected-checkpoint-api-value", m.BinaryLatestVersion)
+			return "", fmt.Errorf("problem determining latest binary version")
+		}
+		return m.BinaryLatestVersion, nil
+	default:
+		if m.BinaryName != Vault {
+			logger.Warn("helper", "binary", m.BinaryName, "unsupported-binary", "Binary not in CheckPoint API or otherwise not supported.")
+			return "", fmt.Errorf("Binary currently unsupported")
+		}
+	}
+	return m.BinaryLatestVersion, nil
+}
+
+// IsInstalledVersion determines if specified binary version is already installed by hvm
 func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 	installedVersion := false
 	m := HelpersMeta{}
@@ -186,8 +331,9 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 	return installedVersion, nil
 }
 
-// ValidateVersion accepts a binary name and proposed version number and validates it
-// against all versions returned from releases.hashicorp.com returning true if valid
+// ValidateVersion accepts a binary name and version number then validates it against all versions
+// from releases.hashicorp.com returning true if the proposed version number matches a version listed there
+// or false if not found or an error occurs
 func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error) {
 	validVersion := false
 	m := HelpersMeta{}
