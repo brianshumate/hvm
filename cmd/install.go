@@ -57,14 +57,14 @@ type InstallMeta struct {
 
 var binaryVersion string
 
-// installCmd represents the install command
+// installCmd downloads, extracts, and installs a binary into the hvm home path
 var installCmd = &cobra.Command{
 	Use:   "install (<binary>) [--version <version>]",
-	Short: "Install a supported binary at the latest available or specified version",
+	Short: "Install binary at latest available or specified version",
 	Long: `
 Install a supported binary binary at specified version for the host detected
-architecture and operating system; if the version flag is omitted, the latest available
-version will be installed.
+architecture and operating system; if the version flag is omitted, the latest
+available version will be installed.
 
 hvm can install the following binaries:
 
@@ -106,6 +106,8 @@ hvm can install the following binaries:
 		m.BinaryDesiredVersion = binaryVersion
 		m.BinaryOS = runtime.GOOS
 		m.BinaryName = strings.Join(args, " ")
+		b := m.BinaryName
+		v := m.BinaryDesiredVersion
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			os.Mkdir(m.HvmHome, 0755)
 		}
@@ -117,10 +119,22 @@ hvm can install the following binaries:
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-
 		// Validate binary attributes with helper functions
+
 		// Is desired binary version valid?
-		// XXX: TODO: finish helper for valid version
+		if v != "" {
+			vv, err := ValidateVersion(b, v)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("cannot determine if %s version %s is valid: %v", b, v, err))
+				os.Exit(1)
+			} else {
+				if vv == false {
+				fmt.Println(fmt.Sprintf("%s is not a version of %s hvm can install", v, b))
+				os.Exit(1)
+				}
+			}
+		}
+
 
 		// Is desired binary already installed?
 		var installedVersion bool

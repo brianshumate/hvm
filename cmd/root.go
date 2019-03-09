@@ -39,8 +39,8 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "hvm",
-	Short: "hvm: curate local HashiCorp command line interface binaries",
-	Long:  `hvm: curate local HashiCorp command line interface binaries`,
+	Short: "hvm: locally curate HashiCorp tool binaries",
+	Long:  `hvm: locally curate HashiCorp tool binaries, such as vault, consul, nomad, packer, and terraform`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -358,10 +358,10 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	logger.Debug("helper", "validateversion", m.BinaryName, "check version", m.BinaryCheckVersion)
+	logger.Info("helper", "validateversion", m.BinaryName, "check version", m.BinaryCheckVersion)
     binaryVersions := []string{}
     var foundVersions bool
-    resp, err := http.Get(fmt.Sprintf("%s/%s", CheckpointURLBase, m.BinaryName))
+    resp, err := http.Get(fmt.Sprintf("%s/%s", ReleaseURLBase, m.BinaryName))
     if err!=nil{
       logger.Error("helper", "failed to open validateversion url with error", err.Error())
       return validVersion, fmt.Errorf("failed to get url with error: %v", err)
@@ -395,14 +395,13 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
             continue
        }
     }
-    fmt.Println("DEBUG: binary versions:", binaryVersions)
-    logger.Info("helper", "binaryversions", binaryVersions)
-
     // we have relatively small slices, so...
+    logger.Info("helper", "Versions", binaryVersions)
     for _, n := range binaryVersions {
         if checkBinaryVersion == n {
-            return true, nil
+        	validVersion = true
+            return validVersion, nil
         }
     }
-    return false, nil
+    return validVersion, nil
 }

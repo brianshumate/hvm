@@ -53,10 +53,20 @@ var useCmd = &cobra.Command{
 	Use:   "use (<binary>) [--version <version>]",
 	Short: "Use a specific binary version",
 	Long: `
-Use the specified binary version; this is not
-accomplished with symbolic links and instead relies
-on copying the specified binary to the hvm binary
-directory which should be in the PATH.`,
+Use a supported binary binary at specified version.
+The --version flag is required.
+
+hvm can use the following binaries:
+
+* consul
+* consul-template (WIP)
+* envconsul (WIP)
+* nomad
+* packer
+* sentinel (WIP)
+* terraform
+* vagrant
+* vault`,
 	Example: `
     hvm use vault --version 1.0.2`,
 	ValidArgs: []string{"consul",
@@ -130,17 +140,17 @@ func useBinary(m *UseMeta) error {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	logger.Debug("use", "f-use-binary", "start", "with-binary", b)
+	logger.Debug("use", "f-use-binary", b)
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
 		logger.Error("use", "unknown-binary-candidate", "GURU DEDICATION EMISSINGVERSION")
 		return fmt.Errorf("use: unknown binary; please specify binary name as first argument")
 	}
 	if m.BinaryDesiredVersion == "" {
-		logger.Debug("use", "f-use-binary", "blank-version", "binary", b)
+		logger.Debug("use", "f-use-binary", b)
 		return fmt.Errorf("use: unknown binary version; please specify version with '--version' flag")
 	}
-	logger.Info("use", "use binary candidate", "final", "binary", b, "desired-version", v)
+	logger.Info("use", "binary", b, "desired-version", v)
 
     // Is desired binary version valid?
     vv, err := ValidateVersion(b, v)
@@ -153,6 +163,7 @@ func useBinary(m *UseMeta) error {
 			os.Exit(1)
 		}
 	}
+
 	// Is desired binary already installed?
 	var installedVersion bool
 	installedVersion, err = IsInstalledVersion(b, v)

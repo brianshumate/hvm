@@ -29,7 +29,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
+	//"os/exec"
 	"runtime"
 	// "strings"
 	"time"
@@ -55,10 +55,10 @@ type InfoMeta struct {
 var infoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "Host information and current versions",
-	Long: `Hashi Version Manager (hvm) is mostly a tongue in cheek personal project,
-but is also quite real; it is not associated with HashiCorp in any official
-capacity whatsoever, but allows you to manage multiple installations of their
-popular CLI tools on supported platforms.`,
+	Long: `Hashi Version Manager (hvm) is mostly a tongue in cheek personal
+project, but is also quite real; it is not associated with HashiCorp in any
+official capacity whatsoever, but allows you to manage multiple installations
+of their popular CLI tools on supported platforms.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		m := InfoMeta{}
 		userHome, err := homedir.Dir()
@@ -87,12 +87,12 @@ popular CLI tools on supported platforms.`,
 			logger.Error("info", "Cannot determine hostname", "error:", err.Error())
 		}
 		m.HostName = hostName
-		consulV, err := checkHashiVersion(&m, "consul")
+		consulV, err := CheckActiveVersion(Consul)
 		if err != nil {
 			logger.Error("info", "cannot determine version", "consul", "error", err.Error())
 		}
 		m.CurrentConsulVersion = consulV
-		vaultV, err := checkHashiVersion(&m, "vault")
+		vaultV, err := CheckActiveVersion(Vault)
 		if err != nil {
 			logger.Error("info", "cannot determine version", "vault", "error", err.Error())
 		}
@@ -118,38 +118,4 @@ popular CLI tools on supported platforms.`,
 
 func init() {
 	rootCmd.AddCommand(infoCmd)
-}
-
-// checkHashiVersion attempts to locate the tools and get their versions -
-// Consul has slightly different version output style so it must be handled differently
-func checkHashiVersion(m *InfoMeta, name string) (string, error) {
-	var version []byte
-	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	path, err := exec.LookPath(name)
-	if err != nil {
-		logger.Error("info", "error detecting binary on PATH", name, "error", err.Error())
-		return "", err
-	}
-	if name == "consul" {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}'", path)).Output()
-		if err != nil {
-			logger.Error("info", "error executing binary", name, "error", err.Error())
-			return "", err
-		}
-		return string(version), nil
-	} else if name == "nomad" || name == "vault" {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", path)).Output()
-		if err != nil {
-			logger.Error("info", "error executing binary", name, "error", err.Error())
-			return "", err
-		}
-		return string(version), nil
-	}
-	return "", err
 }
