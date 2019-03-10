@@ -95,7 +95,7 @@ type HelpersMeta struct {
 	HvmHome             string
 }
 
-// CheckHashiVersion tries to locate binary tools in the system path and get their version using OS calls
+// CheckActiveVersion tries to locate binary tools in the system path and get their version using OS calls
 // Consul has slightly different version output style from others so it must be handled differently
 func CheckActiveVersion(checkBinary string) (string, error) {
 	installedVersion := ""

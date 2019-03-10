@@ -100,10 +100,10 @@ of their popular CLI tools on supported platforms.`,
 		infoData := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
 		t := time.Now()
 		infoData["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
-		if m.CurrentConsulVersion != "ENOVERSION" {
+		if m.CurrentConsulVersion != "" {
 			infoData["Consul version"] = m.CurrentConsulVersion
 		}
-		if m.CurrentVaultVersion != "ENOVERSION" {
+		if m.CurrentVaultVersion != "" {
 			infoData["Vault version"] = m.CurrentVaultVersion
 		}
 		columns := []string{}
