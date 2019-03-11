@@ -79,6 +79,8 @@ hvm can install the following binaries:
 * vault
 `,
 	Example: `
+  hvm install --help
+
   hvm install vault
 
   hvm install nomad --version 0.8.5`,
@@ -109,11 +111,15 @@ hvm can install the following binaries:
 		b := m.BinaryName
 		v := m.BinaryDesiredVersion
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-			os.Mkdir(m.HvmHome, 0755)
+			err = os.Mkdir(m.HvmHome, 0755)
+			if err != nil {
+			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+			os.Exit(1)
+		}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("failed to open log file %s with error: %v", m.LogFile, err))
+			fmt.Println(fmt.Sprintf("Failed to open log file %s with error: %v", m.LogFile, err))
 			os.Exit(1)
 		}
 		defer f.Close()
@@ -130,7 +136,7 @@ hvm can install the following binaries:
     		}
 		}
 		if sb != true {
-			fmt.Println(fmt.Sprintf("Cannot install %s", b))
+			fmt.Println(fmt.Sprintf("Cannot install that.", b))
 			os.Exit(1)
 		}
 
@@ -138,7 +144,7 @@ hvm can install the following binaries:
 		if v != "" {
 			vv, err := ValidateVersion(b, v)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid: %v", b, v, err))
+				fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid; error %v.", b, v, err))
 				os.Exit(1)
 			} else {
 				if vv == false {
@@ -153,22 +159,22 @@ hvm can install the following binaries:
 		var installedVersion bool
 		installedVersion, err = IsInstalledVersion(b, v)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Cannot install binary: %s with error: %v", b, err))
+			fmt.Println(fmt.Sprintf("Cannot install %s with error: %v.", b, err))
 			os.Exit(1)
 		}
 		if installedVersion == true {
 			if m.BinaryDesiredVersion == "" {
-				fmt.Println(fmt.Sprintf("Latest %s version installed", b))
+				fmt.Println(fmt.Sprintf("Latest %s version installed.", b))
 				os.Exit(1)
 			} else {
-				fmt.Println(fmt.Sprintf("%s version %s appears to be already installed", b, v))
+				fmt.Println(fmt.Sprintf("%s version %s appears to be already installed.", b, v))
 				os.Exit(1)
 			}
 		} else {
 			logger.Info("install", "run", b, "desired version", v)
 			err = installBinary(&m)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Cannot install %s version %s with error: %v", b, v, err))
+				fmt.Println(fmt.Sprintf("Cannot install %s version %s with error: %v.", b, v, err))
 				os.Exit(1)
 			}
 		}
@@ -183,6 +189,7 @@ func init() {
 		"version",
 		"",
 		"install binary version")
+	installCmd.MarkFlagRequired("version")
 }
 
 // installBinary has entirely too much going on in it right now!
@@ -285,7 +292,10 @@ func installBinary(m *InstallMeta) error {
 		hvmSpinnerSet := []string{"/", "|", "\\", "-", "|", "\\", "-"}
 		s := spinner.New(hvmSpinnerSet, 174*time.Millisecond)
 		s.Writer = os.Stderr
-		s.Color("fgHiCyan")
+		err = s.Color("fgHiCyan")
+		if err != nil {
+			logger.Debug("install", "weird-error", err.Error())
+		}
 		s.Suffix = " Installing..."
 		s.FinalMSG = fmt.Sprintf("Installed %s (%s/%s) version %s\n", b, m.BinaryOS, m.BinaryArch, v)
 		s.Start()

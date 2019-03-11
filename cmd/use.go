@@ -68,7 +68,9 @@ hvm can use the following binaries:
 * vagrant
 * vault`,
 	Example: `
-    hvm use vault --version 1.0.2`,
+  hvm use --help
+
+  hvm use vault --version 1.0.2`,
 	ValidArgs: []string{"consul",
 		"consul-template",
 		"envconsul",
@@ -78,13 +80,7 @@ hvm can use the following binaries:
 		"terraform",
 		"vagrant",
 		"vault"},
-	// Using a custom args function here as workaround for GH-745
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return fmt.Errorf("use requires exactly 1 argument")
-		}
-		return cobra.OnlyValidArgs(cmd, args)
-	},
+	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		m := UseMeta{}
 		userHome, err := homedir.Dir()
@@ -100,7 +96,11 @@ hvm can use the following binaries:
 		m.BinaryOS = runtime.GOOS
 		m.BinaryName = strings.Join(args, " ")
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-			os.Mkdir(m.HvmHome, 0755)
+			err = os.Mkdir(m.HvmHome, 0755)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+				os.Exit(1)
+			}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -193,7 +193,7 @@ func useBinary(m *UseMeta) error {
 	// else if os.IsNotExist(err) {
 	//     return fmt.Errorf("failed to resolve symbolic link: %+v", err)
 	// }
-	os.Symlink(srcPath, destPath)
+	err = os.Symlink(srcPath, destPath)
 	if err != nil {
 		logger.Error("install", "f-use-binary", "symlink", "error", err)
 		return err
