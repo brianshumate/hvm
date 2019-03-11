@@ -29,9 +29,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	//"os/exec"
 	"runtime"
-	// "strings"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
