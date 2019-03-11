@@ -138,7 +138,6 @@ func CheckActiveVersion(checkBinary string) (string, error) {
 		}
 		return string(version), nil
 	}
-	return "", err
 }
 
 // FetchData grabs bits of HTML data over HTTP
@@ -308,7 +307,10 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 	m.BinaryOS = runtime.GOOS
 	m.BinaryName = checkBinary
 	if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-		os.Mkdir(m.HvmHome, 0755)
+		err = os.Mkdir(m.HvmHome, 0755)
+		if err != nil {
+			return false, fmt.Errorf("failed to create directory %s with error: %v", m.HvmHome, err)
+		}
 	}
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -332,8 +334,8 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 }
 
 // ValidateVersion accepts a binary name and version number then validates it against all versions
-// from releases.hashicorp.com returning true if the proposed version number matches a version listed there
-// or false if not found or an error occurs
+// from releases.hashicorp.com returning true if the proposed version number matches a version listed
+// there or false if not found or an error occurs
 func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error) {
 	validVersion := false
 	m := HelpersMeta{}
@@ -349,7 +351,10 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 	m.BinaryOS = runtime.GOOS
 	m.BinaryName = checkBinary
 	if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-		os.Mkdir(m.HvmHome, 0755)
+		err = os.Mkdir(m.HvmHome, 0755)
+		if err != nil {
+			return false, fmt.Errorf("failed to create directory %s with error: %v", m.HvmHome, err)
+		}
 	}
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -359,49 +364,49 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 	logger.Info("helper", "validateversion", m.BinaryName, "check version", m.BinaryCheckVersion)
-    binaryVersions := []string{}
-    var foundVersions bool
-    resp, err := http.Get(fmt.Sprintf("%s/%s", ReleaseURLBase, m.BinaryName))
-    if err!=nil{
-      logger.Error("helper", "failed to open validateversion url with error", err.Error())
-      return validVersion, fmt.Errorf("failed to get url with error: %v", err)
-    }
-    defer resp.Body.Close()
-    z := html.NewTokenizer(bufio.NewReader(resp.Body))
-    for foundVersions == false {
-      tt := z.Next()
-      switch tt {
-      case html.ErrorToken:
-          return false, nil
-      case html.StartTagToken:
-          t := z.Token()
-          switch t.Data {
-          case "a":
-              z.Next()
-              t = z.Token()
-              version := strings.TrimPrefix(t.Data, fmt.Sprintf("%s_", checkBinary))
-              // strip "../" from inclusion into the slice
-              if version == "../" {
-                continue
-              }
-              binaryVersions = append(binaryVersions, version)
-              if version == "0.1.0" {
-              	// we are at the bottom of the versions list now
-                foundVersions = true
-                break
-              }
-          }
-          default:
-            continue
-       }
-    }
-    // we have relatively small slices, so...
-    logger.Info("helper", "Versions", binaryVersions)
-    for _, n := range binaryVersions {
-        if checkBinaryVersion == n {
-        	validVersion = true
-            return validVersion, nil
-        }
-    }
-    return validVersion, nil
+	binaryVersions := []string{}
+	var foundVersions bool
+	resp, err := http.Get(fmt.Sprintf("%s/%s", ReleaseURLBase, m.BinaryName))
+	if err != nil {
+		logger.Error("helper", "failed to open validateversion url with error", err.Error())
+		return validVersion, fmt.Errorf("failed to get url with error: %v", err)
+	}
+	defer resp.Body.Close()
+	z := html.NewTokenizer(bufio.NewReader(resp.Body))
+	for foundVersions == false {
+		tt := z.Next()
+		switch tt {
+		case html.ErrorToken:
+			return false, nil
+		case html.StartTagToken:
+			t := z.Token()
+			switch t.Data {
+			case "a":
+				z.Next()
+				t = z.Token()
+				version := strings.TrimPrefix(t.Data, fmt.Sprintf("%s_", checkBinary))
+				// strip "../" from inclusion into the slice
+				if version == "../" {
+					continue
+				}
+				binaryVersions = append(binaryVersions, version)
+				if version == "0.1.0" {
+					// we are at the bottom of the versions list now
+					foundVersions = true
+					break
+				}
+			}
+		default:
+			continue
+		}
+	}
+	// we have relatively small slices, so...
+	logger.Info("helper", "Versions", binaryVersions)
+	for _, n := range binaryVersions {
+		if checkBinaryVersion == n {
+			validVersion = true
+			return validVersion, nil
+		}
+	}
+	return validVersion, nil
 }
