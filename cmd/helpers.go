@@ -73,6 +73,7 @@ const (
 
 	// Sentinel binary name
 	Sentinel string = "sentinel"
+
 	// Terraform binary name
 	Terraform string = "terraform"
 

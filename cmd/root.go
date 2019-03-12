@@ -55,7 +55,7 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hvm.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hvm/hvm.yaml)")
 	viper.SetDefault("author", "Brian Shumate <brian@brianshumate.com>")
 	viper.SetDefault("license", "2-Clause BSD")
 }
@@ -67,19 +67,17 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
-		home, err := homedir.Dir()
+		_, err := homedir.Dir()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 		// Search config in home directory with name ".hvm" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".hvm")
+		viper.AddConfigPath("$HOME/.hvm")
+		viper.SetConfigName("hvm")
 	}
-
     // Use any matching environment variables
 	viper.AutomaticEnv()
-
 	// Use config file if found
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())

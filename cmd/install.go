@@ -136,7 +136,7 @@ hvm can install the following binaries:
     		}
 		}
 		if sb != true {
-			fmt.Println(fmt.Sprintf("Cannot install that.", b))
+			fmt.Println("Cannot install that.")
 			os.Exit(1)
 		}
 
