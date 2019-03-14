@@ -90,31 +90,33 @@ hvm can use the following binaries:
 		}
 		m.UserHome = userHome
 		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
-		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
+		m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 		m.BinaryArch = runtime.GOARCH
 		m.BinaryDesiredVersion = binaryVersion
 		m.BinaryOS = runtime.GOOS
 		m.BinaryName = strings.Join(args, " ")
+		b := m.BinaryName
+		v := m.BinaryDesiredVersion
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			err = os.Mkdir(m.HvmHome, 0755)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
-				os.Exit(1)
+			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+			os.Exit(1)
 			}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("failed to open log file with error: %v", err))
+			fmt.Println(fmt.Sprintf("Failed to open log file %s with error: %v", m.LogFile, err))
 			os.Exit(1)
 		}
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		logger.Info("use", "run", "start with binary", m.BinaryName, "desired version", m.BinaryDesiredVersion)
+		logger.Info("use", "run", "start with binary", b, "desired version", v)
 
 		err = useBinary(&m)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", m.BinaryName, err))
+			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", b, err))
 			os.Exit(1)
 		}
 	},

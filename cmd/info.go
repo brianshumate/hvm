@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
@@ -39,14 +40,18 @@ import (
 )
 
 type InfoMeta struct {
-	CurrentConsulVersion string
-	CurrentVaultVersion  string
-	HostArch             string
-	HostName             string
-	HostOS               string
-	HvmHome              string
-	LogFile              string
-	UserHome             string
+	CurrentConsulVersion 	string
+	CurrentNomadVersion  	string
+	CurrentPackerVersion	string
+	CurrentTerraformVersion	string
+	CurrentVagrantVersion	string
+	CurrentVaultVersion  	string
+	HostArch             	string
+	HostName             	string
+	HostOS               	string
+	HvmHome              	string
+	LogFile              	string
+	UserHome             	string
 }
 
 // infoCmd represents the info command
@@ -57,60 +62,92 @@ var infoCmd = &cobra.Command{
 project, but is also quite real; it is not associated with HashiCorp in any
 official capacity whatsoever, but allows you to manage multiple installations
 of their popular CLI tools on supported platforms.`,
+    Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		m := InfoMeta{}
-		userHome, err := homedir.Dir()
-		if err != nil {
-			fmt.Printf("Unable to determine user home directory; error: %s", err)
-			panic(err)
-		}
-		m.UserHome = userHome
-		m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
-		m.LogFile = fmt.Sprintf("%s/.hvm/hvm.log", m.UserHome)
-		m.HostArch = runtime.GOARCH
-		m.HostOS = runtime.GOOS
-		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
-			os.Mkdir(m.HvmHome, 0755)
-		}
-		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			fmt.Println(fmt.Sprintf("failed to open log file with error: %v", err))
-			os.Exit(1)
-		}
-		defer f.Close()
-		w := bufio.NewWriter(f)
-		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		hostName, err := os.Hostname()
-		if err != nil {
-			logger.Error("info", "Cannot determine hostname", "error:", err.Error())
-		}
-		m.HostName = hostName
-		consulV, err := CheckActiveVersion(Consul)
-		if err != nil {
-			logger.Error("info", "cannot determine version", "consul", "error", err.Error())
-		}
-		m.CurrentConsulVersion = consulV
-		vaultV, err := CheckActiveVersion(Vault)
-		if err != nil {
-			logger.Error("info", "cannot determine version", "vault", "error", err.Error())
-		}
-		m.CurrentVaultVersion = vaultV
-		infoData := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
-		t := time.Now()
-		infoData["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
-		if m.CurrentConsulVersion != "" {
-			infoData["Consul version"] = m.CurrentConsulVersion
-		}
-		if m.CurrentVaultVersion != "" {
-			infoData["Vault version"] = m.CurrentVaultVersion
-		}
-		columns := []string{}
-		for k, v := range infoData {
-			columns = append(columns, fmt.Sprintf("%s: | %s ", k, v))
-		}
-		data := columnize.SimpleFormat(columns)
-		fmt.Println("Basic system factoids:")
-		fmt.Printf("%s\n", data)
+			m := InfoMeta{}
+			userHome, err := homedir.Dir()
+			if err != nil {
+				fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
+				os.Exit(1)
+			}
+			m.UserHome = userHome
+			m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
+			m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
+			m.HostArch = runtime.GOARCH
+			m.HostOS = runtime.GOOS
+			if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
+				err = os.Mkdir(m.HvmHome, 0755)
+				if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+				os.Exit(1)
+				}
+			}
+			f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Failed to open log file %s with error: %v", m.LogFile, err))
+				os.Exit(1)
+			}
+			defer f.Close()
+			w := bufio.NewWriter(f)
+			logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
+
+            // System info
+            hostName, err := os.Hostname()
+			if err != nil {
+				logger.Error("info", "Cannot determine hostname", "error:", err.Error())
+			}
+			m.HostName = hostName
+			s := map[string]string{"OS": m.HostOS, "Architecture": m.HostArch}
+			t := time.Now()
+			s["Date/Time"] = t.Format("Mon Jan _2 15:04:05 2006")
+			si := []string{}
+			for k, v := range s {
+				si = append(si, fmt.Sprintf("%s: | %s ", k, v))
+			}
+			// sort.Strings(si)
+			systemData := columnize.SimpleFormat(si)
+
+			// Version info
+			v := map[string]string{}
+			consulV, err := CheckActiveVersion(Consul)
+			if err != nil {
+				logger.Error("info", "cannot determine version", "consul", "error", err.Error())
+			}
+			if consulV != "" {
+				m.CurrentConsulVersion = consulV
+				v["Consul"] = m.CurrentConsulVersion
+            }
+			nomadV, err := CheckActiveVersion(Nomad)
+			if err != nil {
+				logger.Error("info", "cannot determine version", "nomad", "error", err.Error())
+			}
+			if nomadV != "" {
+				m.CurrentNomadVersion = nomadV
+				v["Nomad"] = m.CurrentNomadVersion
+            }
+			vaultV, err := CheckActiveVersion(Vault)
+			if err != nil {
+				logger.Error("info", "cannot determine version", "vault", "error", err.Error())
+			}
+			if vaultV != "" {
+				m.CurrentVaultVersion = vaultV
+				v["Vault"] = m.CurrentVaultVersion
+			}
+            vi := []string{}
+			for k, v := range v {
+				vi = append(vi, fmt.Sprintf("%s: | %s ", k, v))
+			}
+			sort.Strings(vi)
+			versionData := columnize.SimpleFormat(vi)
+
+            // Display all
+			fmt.Println("System Factoids")
+			fmt.Println("")
+			fmt.Println(systemData)
+			fmt.Println("")
+			fmt.Println("Installed Versions")
+			fmt.Println("")
+			fmt.Println(versionData)
 	},
 }
 

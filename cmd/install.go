@@ -28,7 +28,7 @@ package cmd
 import (
 	"bufio"
 	"bytes"
-	//"errors"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -93,7 +93,23 @@ hvm can install the following binaries:
 		"terraform",
 		"vagrant",
 		"vault"},
-	Args: cobra.MinimumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+    if len(args) < 1 {
+      return errors.New("requires at least one argument, the name of a binary to install.")
+    }
+    // Is desired binary supported?
+    b := args[0]
+    s := []string{Consul, Nomad, Packer, Terraform, Vagrant, Vault}
+    for _, v := range s {
+		if v == b {
+    		return nil
+		}
+	}
+	// This is not ideal. We need a custom usage that basically _is_ the `hvm install --help` output
+	// instead of the main usage; custom usage functions and templates are possible with Cobra
+	// but I have yet to give that a try...
+	return fmt.Errorf("Cannot install %s; for a list of supported binaries, use hvm install --help", b)
+  	},
 	Run: func(cmd *cobra.Command, args []string) {
 		m := InstallMeta{}
 		userHome, err := homedir.Dir()
@@ -115,7 +131,7 @@ hvm can install the following binaries:
 			if err != nil {
 			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
 			os.Exit(1)
-		}
+			}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -125,21 +141,6 @@ hvm can install the following binaries:
 		defer f.Close()
 		w := bufio.NewWriter(f)
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-		// Validate binary attributes with helper functions
-
-        // Is it a supported binary?
-        s := []string{Consul, Nomad, Packer, Terraform, Vagrant, Vault}
-        sb := false
-        for _, v := range s {
-    		if v == b {
-        		sb = true
-    		}
-		}
-		if sb != true {
-			fmt.Println(fmt.Sprintf("Cannot install %s for a list of supported binaries, use: hvm install --help", b))
-			os.Exit(1)
-		}
-
 		// Is desired binary version valid?
 		if v != "" {
 			vv, err := ValidateVersion(b, v)
@@ -153,8 +154,6 @@ hvm can install the following binaries:
 				}
 			}
 		}
-
-
 		// Is desired binary already installed?
 		var installedVersion bool
 		installedVersion, err = IsInstalledVersion(b, v)
@@ -163,11 +162,12 @@ hvm can install the following binaries:
 			os.Exit(1)
 		}
 		if installedVersion == true {
-			if m.BinaryDesiredVersion == "" {
-				fmt.Println(fmt.Sprintf("Latest %s version installed.", b))
+			// XXX: This is busted!
+			if v == "" {
+				fmt.Println(fmt.Sprintf("Latest %s version is already installed.", b))
 				os.Exit(1)
 			} else {
-				fmt.Println(fmt.Sprintf("%s version %s appears to be already installed.", b, v))
+				fmt.Println(fmt.Sprintf("%s version %s is already installed.", b, v))
 				os.Exit(1)
 			}
 		} else {
@@ -285,9 +285,6 @@ func installBinary(m *InstallMeta) error {
 		fullURL := fmt.Sprintf("%s/%s/%s/%s?checksum=sha256:%s", ReleaseURLBase, b, v, pkgFilename, checkSha)
 		installPath := fmt.Sprintf("%s/%s", targetPath, b)
 		logger.Debug("install", "valid-binary", "true", "full-url", fullURL, "install-path", installPath)
-		// Get binary archive using go-getter from a URL which takes the form of:
-		// 'https://releases.hashicorp.com/<binary>/<version>/<binary>_<version>_<os>_<arch>.zip
-		// go-getter validates the intended download against its published SHA256 summary before downloading, or fails if the there is mismatch / other issue which prevents comparison.
 		// Shout out to Ye Olde School BSD spinner!
 		hvmSpinnerSet := []string{"/", "|", "\\", "-", "|", "\\", "-"}
 		s := spinner.New(hvmSpinnerSet, 174*time.Millisecond)
@@ -301,6 +298,9 @@ func installBinary(m *InstallMeta) error {
 		s.Start()
 		logger.Debug("install", "status", "go-getter", "download-url", fullURL)
 		logger.Debug("install", "status", "go-getter", "install-path", installPath)
+		// Get binary archive using go-getter from a URL which takes the form of:
+		// 'https://releases.hashicorp.com/<binary>/<version>/<binary>_<version>_<os>_<arch>.zip
+		// go-getter validates the intended download against its published SHA256 summary before downloading, or fails if the there is mismatch / other issue which prevents comparison.
 		if err := getter.GetFile(installPath, fullURL); err != nil {
 			fmt.Printf("Download error with %q", err)
 			// If the SHA don't match or we hit any issue, then we ain't dancing!
