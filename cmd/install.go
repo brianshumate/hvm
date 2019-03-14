@@ -113,9 +113,9 @@ hvm can install the following binaries:
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			err = os.Mkdir(m.HvmHome, 0755)
 			if err != nil {
-			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
-			os.Exit(1)
-		}
+				fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+				os.Exit(1)
+			}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
@@ -127,16 +127,16 @@ hvm can install the following binaries:
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		// Validate binary attributes with helper functions
 
-        // Is it a supported binary?
-        s := []string{Consul, Nomad, Packer, Terraform, Vagrant, Vault}
-        sb := false
-        for _, v := range s {
-    		if v == b {
-        		sb = true
-    		}
+		// Is it a supported binary?
+		s := []string{Consul, Nomad, Packer, Terraform, Vagrant, Vault}
+		sb := false
+		for _, v := range s {
+			if v == b {
+				sb = true
+			}
 		}
 		if sb != true {
-			fmt.Println(fmt.Sprintf("Cannot install %s for a list of supported binaries, use: hvm install --help", b))
+			fmt.Println(fmt.Sprintf("Cannot install %s; for a list of supported binaries, use: hvm install --help", b))
 			os.Exit(1)
 		}
 
@@ -148,12 +148,11 @@ hvm can install the following binaries:
 				os.Exit(1)
 			} else {
 				if vv == false {
-				fmt.Println(fmt.Sprintf("Cannot install %s version %s; it is not available from releases.hashicorp.com.", b, v))
-				os.Exit(1)
+					fmt.Println(fmt.Sprintf("Cannot install %s version %s; it is not available from releases.hashicorp.com.", b, v))
+					os.Exit(1)
 				}
 			}
 		}
-
 
 		// Is desired binary already installed?
 		var installedVersion bool
