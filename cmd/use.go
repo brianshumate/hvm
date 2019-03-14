@@ -137,7 +137,7 @@ func useBinary(m *UseMeta) error {
 	v := m.BinaryDesiredVersion
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open log file with error: %v", err)
+		return fmt.Errorf("Failed to open log file with error: %v", err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -146,18 +146,18 @@ func useBinary(m *UseMeta) error {
 	if m.BinaryName == "" {
 		m.BinaryName = "none"
 		logger.Error("use", "unknown-binary-candidate", "GURU DEDICATION EMISSINGVERSION")
-		return fmt.Errorf("use: unknown binary; please specify binary name as first argument")
+		return fmt.Errorf("Unknown binary; please specify binary name as first argument")
 	}
 	if m.BinaryDesiredVersion == "" {
 		logger.Debug("use", "f-use-binary", b)
-		return fmt.Errorf("use: unknown binary version; please specify version with '--version' flag")
+		return fmt.Errorf("Unknown binary version; please specify version with '--version' flag")
 	}
 	logger.Info("use", "binary", b, "desired-version", v)
 
-    // Is desired binary version valid?
-    vv, err := ValidateVersion(b, v)
+	// Is desired binary version valid?
+	vv, err := ValidateVersion(b, v)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("cannot determine if %s version %s is valid: %v", b, v, err))
+		fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid: %v", b, v, err))
 		os.Exit(1)
 	} else {
 		if vv == false {
@@ -170,13 +170,13 @@ func useBinary(m *UseMeta) error {
 	var installedVersion bool
 	installedVersion, err = IsInstalledVersion(b, v)
 	if err != nil {
-		fmt.Println(fmt.Sprintf("cannot determine if %s version %s is installed: %v", b, v, err))
+		fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is installed: %v", b, v, err))
 		os.Exit(1)
 	}
 	if installedVersion == true {
 		logger.Debug("use", "binary", b, "version", v, "installed", "true")
 	} else {
-		fmt.Println(fmt.Sprintf("%s version %s is not installed. install it with: hvm install %s --version %s", b, v, b, v))
+		fmt.Println(fmt.Sprintf("%s version %s is not installed; install it with: hvm install %s --version %s", b, v, b, v))
 		os.Exit(1)
 	}
 	srcPath := fmt.Sprintf("%s/%s/%s/%s", m.HvmHome, b, v, b)
@@ -188,7 +188,7 @@ func useBinary(m *UseMeta) error {
 				return fmt.Errorf("failed to unlink %s with error: %+v", destPath, err)
 			}
 		} else {
-			return fmt.Errorf("path %s exists and is not a symbolic link created by hvm\nhvm needs your help to resolve this problem; please inspect and move %s", destPath, destPath)
+			return fmt.Errorf("Path %s exists and is not a symbolic link created by hvm\nhvm needs your help to resolve this problem; please inspect and move %s", destPath, destPath)
 		}
 	}
 	// XXX: yarrr

@@ -156,6 +156,7 @@ hvm can install the following binaries:
 		}
 		// Is desired binary already installed?
 		var installedVersion bool
+
 		installedVersion, err = IsInstalledVersion(b, v)
 		if err != nil {
 			fmt.Println(fmt.Sprintf("Cannot install %s with error: %v.", b, err))
