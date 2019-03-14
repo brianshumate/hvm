@@ -136,7 +136,7 @@ hvm can install the following binaries:
     		}
 		}
 		if sb != true {
-			fmt.Println("Cannot install that.")
+			fmt.Println(fmt.Sprintf("Cannot install %s for a list of supported binaries, use: hvm install --help", b))
 			os.Exit(1)
 		}
 
@@ -148,7 +148,7 @@ hvm can install the following binaries:
 				os.Exit(1)
 			} else {
 				if vv == false {
-				fmt.Println(fmt.Sprintf("Cannot install %s version %s.", b, v))
+				fmt.Println(fmt.Sprintf("Cannot install %s version %s; it is not available from releases.hashicorp.com.", b, v))
 				os.Exit(1)
 				}
 			}
