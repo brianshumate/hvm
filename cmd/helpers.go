@@ -22,6 +22,9 @@
 // CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
+//
+// helpers are random functions which are often shared and intermingled amongst the
+// commands and so just sort of hang out here for now...
 
 package cmd
 
@@ -97,100 +100,100 @@ type HelpersMeta struct {
 }
 
 // CheckActiveVersion tries to locate binary tools in the system path and get their version using OS calls
-// Consul has slightly different version output style from others so it must be handled differently
-func CheckActiveVersion(checkBinary string) (string, error) {
-	installedVersion := ""
-	m := HelpersMeta{}
+// 'consul version' has a slightly different output style from the others, and must be handled differently
+func CheckActiveVersion(binary string) (string, error) {
+	activeVersion := ""
 	userHome, err := homedir.Dir()
 	if err != nil {
-		return installedVersion, fmt.Errorf("Unable to determine user home directory; error: %v", err)
+		return activeVersion, fmt.Errorf("Cannot determine user home directory with error: %v", err)
 	}
+	m := HelpersMeta{}
 	m.UserHome = userHome
 	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 	m.BinaryArch = runtime.GOARCH
 	m.BinaryOS = runtime.GOOS
-	m.BinaryName = checkBinary
+	m.BinaryName = binary
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return "", fmt.Errorf("Cannot open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
-	path, err := exec.LookPath(checkBinary)
+	binPath, err := exec.LookPath(binary)
 	if err != nil {
-		logger.Error("info", "error detecting binary on PATH", checkBinary, "error", err.Error())
-		return "", err
+		logger.Error("helper", "cannot detect binary on PATH", binary, "error", err.Error())
+		return "", fmt.Errorf("Cannot detect binary on PATH with error: %v", err)
 	}
 	var version []byte
-	if checkBinary == Consul {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}'", path)).Output()
+	if binary == Consul {
+		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}'", binPath)).Output()
 		if err != nil {
-			logger.Error("info", "error executing binary", checkBinary, "error", err.Error())
-			return "", err
+			logger.Error("helper", "cannot execute binary", binary, "error", err.Error())
+			return "", fmt.Errorf("Cannot execute binary with error: %v", err)
 		}
 		return string(version), nil
 	} else {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", path)).Output()
+		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", binPath)).Output()
 		if err != nil {
-			logger.Error("info", "error executing binary", checkBinary, "error", err.Error())
-			return "", err
+			logger.Error("helper", "cannot execute binary", binary, "error", err.Error())
+			return "", fmt.Errorf("Cannot execute binary with error: %v", err)
 		}
 		return string(version), nil
 	}
 }
 
-// FetchData grabs bits of HTML data over HTTP
+// FetchData grabs bits of HTML data over HTTP for some reason...
 func FetchData(URL string) ([]byte, error) {
-	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
 	if err != nil {
-		return nil, fmt.Errorf("Unable to determine user home directory; error: %v", err)
+		return nil, fmt.Errorf("Cannot determine user home directory with error: %v", err)
 	}
+	m := HelpersMeta{}
 	m.UserHome = userHome
 	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return nil, fmt.Errorf("Cannot open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 	response, err := http.Get(URL)
 	if err != nil {
-		logger.Error("helper", "fetch data error", err.Error())
-		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
+		logger.Error("helper", "Cannot fetch data with error", err.Error())
+		return nil, fmt.Errorf("cannot fetch data with error: %v", err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		err = errors.New(response.Status)
-		logger.Error("helper", "fetch data error", err.Error())
-		return nil, fmt.Errorf("failed to fetch data with error: %v", err)
+		logger.Error("helper", "Cannot fetch data with error", err.Error())
+		return nil, fmt.Errorf("cannot failed to fetch data with error: %v", err)
 	}
 	var fetchData bytes.Buffer
 	_, err = io.Copy(&fetchData, response.Body)
 	if err != nil {
-		logger.Error("helper", "fetch data error", err.Error())
-		return nil, fmt.Errorf("failed to fetch data with bytes buffer error: %v", err)
+		logger.Error("helper", "cannot fetch data with error", err.Error())
+		return nil, fmt.Errorf("Cannot fetch data with bytes buffer with error: %v", err)
 	}
 	return fetchData.Bytes(), nil
 }
 
-// GetLatestVersion returns the latest version of a binary
+// GetLatestVersion returns the latest available binary version from releases.hashicorp.com
 func GetLatestVersion(binary string) (string, error) {
-	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
 	if err != nil {
-		return "", fmt.Errorf("Unable to determine user home directory; error: %v", err)
+		return "", fmt.Errorf("Cannot determine user home directory with error: %v", err)
 	}
+	m := HelpersMeta{}
 	m.UserHome = userHome
 	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to open log file %s with error: %v", m.LogFile, err)
+		return "", fmt.Errorf("Cannot open log file %s with error: %v", m.LogFile, err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -198,14 +201,14 @@ func GetLatestVersion(binary string) (string, error) {
 	logger.Debug("helper", "f-get-latest-version", binary)
 	switch binary {
 	// Some binary latest versions cannot be queried through the Checkpoint API.
-	// Those must unfortunately use an HTML scraping approach instead.
+	// Those binaries must unfortunately be queried using an HTML scraping approach instead.
 	case Vault:
 		logger.Debug("helper", "f-get-latest-version-html-scrape-url-base", VaultReleaseURLBase)
 		logger.Debug("helper", "f-get-latest-version-html-scrape-binary-name", binary)
 		var found bool
 		resp, err := http.Get(VaultReleaseURLBase)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("Cannot get Vault release URL with error: %v", err)
 		}
 		defer resp.Body.Close()
 		z := html.NewTokenizer(bufio.NewReader(resp.Body))
@@ -234,45 +237,40 @@ func GetLatestVersion(binary string) (string, error) {
 	case Consul, Nomad, Packer, Vagrant, Terraform:
 		logger.Debug("helper", "f-get-latest-version-checkpoint-url-base", CheckpointURLBase)
 		logger.Debug("helper", "f-get-latest-version-checkpoint-binary-name", binary)
-
 		checkpointDataURL := fmt.Sprintf("%s/v1/check/%s", CheckpointURLBase, binary)
 		logger.Debug("helper", "f-get-latest-version-checkpoint-data-url", checkpointDataURL)
-
 		checkPointClient := http.Client{Timeout: time.Second * 2}
 		req, err := http.NewRequest(http.MethodGet, checkpointDataURL, nil)
 		if err != nil {
 			logger.Error("helper", "f-get-latest-version", "request-error", err.Error())
 			return "", err
 		}
-
 		req.Header.Set("User-Agent", "hvm-oss-http-client")
 		res, err := checkPointClient.Do(req)
 		if err != nil {
 			logger.Error("helper", "f-get-latest-version", "get-error", err.Error())
 			return "", err
 		}
-
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			logger.Error("helper", "f-get-latest-version", "read-body-error", err.Error())
 			return "", err
 		}
-
 		err = json.Unmarshal(body, &m)
 		if err != nil {
 			logger.Error("helper", "f-get-latest-version", "json-unmarshall-error", err.Error())
-			return "", fmt.Errorf("failed to unmarshal JSON with error: %v", err)
+			return "", fmt.Errorf("cannot unmarshal JSON with error: %v", err)
 		}
 		// Ensure that we get something like a valid version back from the API
 		// and not a maintenance page or similar...
 		checkpointLatestVersion, err := version.NewVersion(m.BinaryLatestVersion)
 		if err != nil {
-			logger.Error("helper", "issue", "Could not determine comparison version!", "error", err.Error())
+			logger.Error("helper", "issue", "cannot determine comparison version", "error", err.Error())
 			return "", err
 		}
 		constraints, err := version.NewConstraint(">= 0.0.1")
 		if err != nil {
-			logger.Error("helper", "f-get-latest-version", "issue", "Could not determine comparison constraints!", "error", err.Error())
+			logger.Error("helper", "f-get-latest-version", "issue", "cannot determine comparison constraints", "error", err.Error())
 			return "", err
 		}
 		if constraints.Check(checkpointLatestVersion) {
@@ -293,7 +291,7 @@ func GetLatestVersion(binary string) (string, error) {
 }
 
 // IsInstalledVersion determines if specified binary version is already installed by hvm
-func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
+func IsInstalledVersion(binary string, checkVersion string) (bool, error) {
 	installedVersion := false
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
@@ -306,7 +304,7 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 	m.BinaryArch = runtime.GOARCH
 	m.BinaryCheckVersion = checkVersion
 	m.BinaryOS = runtime.GOOS
-	m.BinaryName = checkBinary
+	m.BinaryName = binary
 	if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 		err = os.Mkdir(m.HvmHome, 0755)
 		if err != nil {
@@ -337,7 +335,7 @@ func IsInstalledVersion(checkBinary string, checkVersion string) (bool, error) {
 // ValidateVersion accepts a binary name and version number then validates it against all versions
 // from releases.hashicorp.com returning true if the proposed version number matches a version listed
 // there or false if not found or an error occurs
-func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error) {
+func ValidateVersion(binary string, binaryVersion string) (bool, error) {
 	validVersion := false
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
@@ -348,9 +346,9 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 	m.HvmHome = fmt.Sprintf("%s/.hvm", m.UserHome)
 	m.LogFile = fmt.Sprintf("%s/hvm.log", m.HvmHome)
 	m.BinaryArch = runtime.GOARCH
-	m.BinaryCheckVersion = checkBinaryVersion
+	m.BinaryCheckVersion = binaryVersion
 	m.BinaryOS = runtime.GOOS
-	m.BinaryName = checkBinary
+	m.BinaryName = binary
 	if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 		err = os.Mkdir(m.HvmHome, 0755)
 		if err != nil {
@@ -385,7 +383,7 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 			case "a":
 				z.Next()
 				t = z.Token()
-				version := strings.TrimPrefix(t.Data, fmt.Sprintf("%s_", checkBinary))
+				version := strings.TrimPrefix(t.Data, fmt.Sprintf("%s_", binary))
 				// strip "../" from inclusion into the slice
 				if version == "../" {
 					continue
@@ -404,7 +402,7 @@ func ValidateVersion(checkBinary string, checkBinaryVersion string) (bool, error
 	// we have relatively small slices, so...
 	logger.Info("helper", "Versions", binaryVersions)
 	for _, n := range binaryVersions {
-		if checkBinaryVersion == n {
+		if binaryVersion == n {
 			validVersion = true
 			return validVersion, nil
 		}

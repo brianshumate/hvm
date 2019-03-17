@@ -67,7 +67,7 @@ of their popular CLI tools on supported platforms.`,
 			m := InfoMeta{}
 			userHome, err := homedir.Dir()
 			if err != nil {
-				fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
+				fmt.Println(fmt.Sprintf("cannot access home directory with error: %v", err))
 				os.Exit(1)
 			}
 			m.UserHome = userHome
@@ -78,13 +78,13 @@ of their popular CLI tools on supported platforms.`,
 			if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 				err = os.Mkdir(m.HvmHome, 0755)
 				if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+				fmt.Println(fmt.Sprintf("Cannot create directory %s with error: %v", m.HvmHome, err))
 				os.Exit(1)
 				}
 			}
 			f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Failed to open log file %s with error: %v", m.LogFile, err))
+				fmt.Println(fmt.Sprintf("Cannot open log file %s with error: %v", m.LogFile, err))
 				os.Exit(1)
 			}
 			defer f.Close()

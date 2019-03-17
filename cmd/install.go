@@ -114,7 +114,7 @@ hvm can install the following binaries:
 		m := InstallMeta{}
 		userHome, err := homedir.Dir()
 		if err != nil {
-			fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
+			fmt.Println(fmt.Sprintf("cannot access home directory with error: %v", err))
 			os.Exit(1)
 		}
 		m.UserHome = userHome
@@ -129,7 +129,7 @@ hvm can install the following binaries:
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			err = os.Mkdir(m.HvmHome, 0755)
 			if err != nil {
-			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+			fmt.Println(fmt.Sprintf("Cannot create directory %s with error: %v", m.HvmHome, err))
 			os.Exit(1)
 			}
 		}
@@ -145,7 +145,7 @@ hvm can install the following binaries:
 		if v != "" {
 			vv, err := ValidateVersion(b, v)
 			if err != nil {
-				fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid; error %v.", b, v, err))
+				fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid with error %v.", b, v, err))
 				os.Exit(1)
 			} else {
 				if vv == false {
@@ -231,7 +231,7 @@ func installBinary(m *InstallMeta) error {
 				err := os.MkdirAll(targetPath, 0770)
 				if err != nil {
 					logger.Error("install", "directory-creation-error", err.Error())
-					return fmt.Errorf("directory creation error: %v", err)
+					return fmt.Errorf("Cannot create directory %s with error: %v", targetPath, err)
 				}
 			}
 		}
@@ -242,7 +242,7 @@ func installBinary(m *InstallMeta) error {
 		logger.Debug("install", "sha256sums-file-url", binaryShaURL)
 		binarySha, err := FetchData(binaryShaURL)
 		if err != nil {
-			logger.Error("install", "download-sha256sums-error", err.Error())
+			logger.Error("install", "cannot download sha256sums with error", err.Error())
 			return err
 		}
 		shaStream := bytes.NewReader(binarySha)
@@ -255,12 +255,12 @@ func installBinary(m *InstallMeta) error {
 					logger.Debug("install", "stage", "scanner", "binary", Nomad)
 					nomadLatestVersion, err := version.NewVersion(v)
 					if err != nil {
-						logger.Error("install", "issue", "Could not determine Nomad comparison version!", "error", err.Error())
+						logger.Error("install", "issue", "cannot determine Nomad comparison version", "error", err.Error())
 						return err
 					}
 					constraints, err := version.NewConstraint(">= 0.7.0-beta1")
 					if err != nil {
-						logger.Error("install", "issue", "Could not determine Nomad version constraints", "error", err.Error())
+						logger.Error("install", "issue", "cannot determine Nomad version constraints", "error", err.Error())
 						return err
 					}
 					// Handle the current Nomad SHA256SUMS style
@@ -313,6 +313,6 @@ func installBinary(m *InstallMeta) error {
 		return nil
 	default:
 		logger.Warn("install", "binary", b, "unsupported-binary", "not in CheckPoint API")
-		return fmt.Errorf("Binary %s currently unsupported", b)
+		return fmt.Errorf("Cannot install %s; it is not currently supported; for a list of supported binaries, use hvm install --help", b)
 	}
 }

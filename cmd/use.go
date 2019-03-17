@@ -85,7 +85,7 @@ hvm can use the following binaries:
 		m := UseMeta{}
 		userHome, err := homedir.Dir()
 		if err != nil {
-			fmt.Println(fmt.Sprintf("failed to access home directory with error: %v", err))
+			fmt.Println(fmt.Sprintf("Cannot access home directory with error: %v", err))
 			os.Exit(1)
 		}
 		m.UserHome = userHome
@@ -100,13 +100,13 @@ hvm can use the following binaries:
 		if _, err := os.Stat(m.HvmHome); os.IsNotExist(err) {
 			err = os.Mkdir(m.HvmHome, 0755)
 			if err != nil {
-			fmt.Println(fmt.Sprintf("Failed to create directory %s with error: %v", m.HvmHome, err))
+			fmt.Println(fmt.Sprintf("Cannot create directory %s with error: %v", m.HvmHome, err))
 			os.Exit(1)
 			}
 		}
 		f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("Failed to open log file %s with error: %v", m.LogFile, err))
+			fmt.Println(fmt.Sprintf("Cannot open log file %s with error: %v", m.LogFile, err))
 			os.Exit(1)
 		}
 		defer f.Close()
@@ -116,7 +116,7 @@ hvm can use the following binaries:
 
 		err = useBinary(&m)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("cannot use binary: %s with error: %v", b, err))
+			fmt.Println(fmt.Sprintf("Cannot use binary %s with error: %v", b, err))
 			os.Exit(1)
 		}
 	},
@@ -137,7 +137,7 @@ func useBinary(m *UseMeta) error {
 	v := m.BinaryDesiredVersion
 	f, err := os.OpenFile(m.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("Failed to open log file with error: %v", err)
+		return fmt.Errorf("Cannot open log file with error: %v", err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -200,6 +200,6 @@ func useBinary(m *UseMeta) error {
 		logger.Error("install", "f-use-binary", "symlink", "error", err)
 		return err
 	}
-	fmt.Println(fmt.Sprintf("Now using %s (%s/%s) version %s", b, m.BinaryOS, m.BinaryArch, v))
+	fmt.Println(fmt.Sprintf("Using %s (%s/%s) version %s", b, m.BinaryOS, m.BinaryArch, v))
 	return nil
 }
