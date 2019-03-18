@@ -34,10 +34,10 @@ import (
 // listCmd represents the list command
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List available binary versions",
+	Short: "List locally and remotely available binary versions",
 	Long: `
-List all versions published to releases.hashicorp.com
-for the specified binary name:
+List both locally installed versions and all versions published to
+releases.hashicorp.com for the specified binary name:
 
 hvm list vault
 `,

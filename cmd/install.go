@@ -60,7 +60,7 @@ var binaryVersion string
 // installCmd downloads, extracts, and installs a binary into the hvm home path
 var installCmd = &cobra.Command{
 	Use:   "install (<binary>) [--version <version>]",
-	Short: "Install binary at latest available or specified version",
+	Short: "Install a binary at latest available or specified version",
 	Long: `
 Install a supported binary binary at specified version for the host detected
 architecture and operating system; if the version flag is omitted, the latest

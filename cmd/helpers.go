@@ -128,14 +128,14 @@ func CheckActiveVersion(binary string) (string, error) {
 	}
 	var version []byte
 	if binary == Consul {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}'", binPath)).Output()
+		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | head -n 1 | awk '{print $2}' | cut -d 'v' -f2", binPath)).Output()
 		if err != nil {
 			logger.Error("helper", "cannot execute binary", binary, "error", err.Error())
 			return "", fmt.Errorf("Cannot execute binary with error: %v", err)
 		}
 		return string(version), nil
 	} else {
-		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}'", binPath)).Output()
+		version, err = exec.Command("/bin/sh", "-c", fmt.Sprintf("%s version | awk '{print $2}' | cut -d 'v' -f2", binPath)).Output()
 		if err != nil {
 			logger.Error("helper", "cannot execute binary", binary, "error", err.Error())
 			return "", fmt.Errorf("Cannot execute binary with error: %v", err)
