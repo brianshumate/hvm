@@ -57,7 +57,7 @@ type InfoMeta struct {
 // infoCmd represents the info command
 var infoCmd = &cobra.Command{
 	Use:   "info",
-	Short: "Host information and current versions",
+	Short: "Host system information and current versions",
 	Long: `Hashi Version Manager (hvm) is mostly a tongue in cheek personal
 project, but is also quite real; it is not associated with HashiCorp in any
 official capacity whatsoever, but allows you to manage multiple installations
