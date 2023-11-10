@@ -143,7 +143,7 @@ hvm can install the following binaries:
 		logger := hclog.New(&hclog.LoggerOptions{Name: "hvm", Level: hclog.LevelFromString("INFO"), Output: w})
 		// Is desired binary version valid?
 		if v != "" {
-			vv, err := ValidateVersion(b, v)
+			vv, err := ValidVersion(b, v)
 			if err != nil {
 				fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid with error %v.", b, v, err))
 				os.Exit(1)
@@ -157,7 +157,7 @@ hvm can install the following binaries:
 		// Is desired binary already installed?
 		var installedVersion bool
 
-		installedVersion, err = IsInstalledVersion(b, v)
+		installedVersion, err = InstalledVersion(b, v)
 		if err != nil {
 			fmt.Println(fmt.Sprintf("Cannot install %s with error: %v.", b, err))
 			os.Exit(1)
@@ -213,7 +213,7 @@ func installBinary(m *InstallMeta) error {
 	}
 	if v == "" {
 		logger.Debug("install", "f-install-binary", "blank-version", "binary", b)
-		latestBinaryVersion, err := GetLatestVersion(b)
+		latestBinaryVersion, err := LatestReleaseVersion(b)
 		if err != nil {
 			logger.Error("install", "get-latest-version-fail", "error", err.Error())
 			return err
@@ -240,7 +240,7 @@ func installBinary(m *InstallMeta) error {
 		// in map for comparison
 		binaryShaURL := fmt.Sprintf("%s/%s/%s/%s_%s_SHA256SUMS", ReleaseURLBase, b, v, b, v)
 		logger.Debug("install", "sha256sums-file-url", binaryShaURL)
-		binarySha, err := FetchData(binaryShaURL)
+		binarySha, err := HTMLData(binaryShaURL)
 		if err != nil {
 			logger.Error("install", "cannot download sha256sums with error", err.Error())
 			return err

@@ -99,9 +99,9 @@ type HelpersMeta struct {
 	HvmHome             string
 }
 
-// CheckActiveVersion tries to locate binary tools in the system path and get their version using OS calls
+// ActiveLocalVersion tries to locate binary tools in the system path and get their version using OS calls
 // 'consul version' has a slightly different output style from the others, and must be handled differently
-func CheckActiveVersion(binary string) (string, error) {
+func ActiveLocalVersion(binary string) (string, error) {
 	activeVersion := ""
 	userHome, err := homedir.Dir()
 	if err != nil {
@@ -144,8 +144,8 @@ func CheckActiveVersion(binary string) (string, error) {
 	}
 }
 
-// FetchData grabs bits of HTML data over HTTP for some reason...
-func FetchData(URL string) ([]byte, error) {
+// HMLTData returns bits of HTML Data
+func HTMLData(URL string) ([]byte, error) {
 	userHome, err := homedir.Dir()
 	if err != nil {
 		return nil, fmt.Errorf("Cannot determine user home directory with error: %v", err)
@@ -181,8 +181,8 @@ func FetchData(URL string) ([]byte, error) {
 	return fetchData.Bytes(), nil
 }
 
-// GetLatestVersion returns the latest available binary version from releases.hashicorp.com
-func GetLatestVersion(binary string) (string, error) {
+// LatestReleaseVersion returns the latest available binary version from releases.hashicorp.com
+func LatestReleaseVersion(binary string) (string, error) {
 	userHome, err := homedir.Dir()
 	if err != nil {
 		return "", fmt.Errorf("Cannot determine user home directory with error: %v", err)
@@ -290,8 +290,8 @@ func GetLatestVersion(binary string) (string, error) {
 	return m.BinaryLatestVersion, nil
 }
 
-// IsInstalledVersion determines if specified binary version is already installed by hvm
-func IsInstalledVersion(binary string, checkVersion string) (bool, error) {
+// InstalledVersion determines if specified binary version is already installed by hvm
+func InstalledVersion(binary string, checkVersion string) (bool, error) {
 	installedVersion := false
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()
@@ -332,10 +332,15 @@ func IsInstalledVersion(binary string, checkVersion string) (bool, error) {
 	return installedVersion, nil
 }
 
-// ValidateVersion accepts a binary name and version number then validates it against all versions
-// from releases.hashicorp.com returning true if the proposed version number matches a version listed
-// there or false if not found or an error occurs
-func ValidateVersion(binary string, binaryVersion string) (bool, error) {
+// LocalVersionList gets a list of locally installed versions
+// func LocalVersionList(binary string) ([]string, error) {
+
+// }
+
+// ValidVersion accepts a binary name and version number then validates it against all versions
+// from releases.hashicorp.com returning true if the proposed version number matches a version
+// listed there or false if not found or an error occurs
+func ValidVersion(binary string, binaryVersion string) (bool, error) {
 	validVersion := false
 	m := HelpersMeta{}
 	userHome, err := homedir.Dir()

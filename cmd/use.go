@@ -155,7 +155,7 @@ func useBinary(m *UseMeta) error {
 	logger.Info("use", "binary", b, "desired-version", v)
 
 	// Is desired binary version valid?
-	vv, err := ValidateVersion(b, v)
+	vv, err := ValidVersion(b, v)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is valid: %v", b, v, err))
 		os.Exit(1)
@@ -168,7 +168,7 @@ func useBinary(m *UseMeta) error {
 
 	// Is desired binary already installed?
 	var installedVersion bool
-	installedVersion, err = IsInstalledVersion(b, v)
+	installedVersion, err = InstalledVersion(b, v)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Cannot determine if %s version %s is installed: %v", b, v, err))
 		os.Exit(1)
@@ -188,7 +188,7 @@ func useBinary(m *UseMeta) error {
 				return fmt.Errorf("failed to unlink %s with error: %+v", destPath, err)
 			}
 		} else {
-			return fmt.Errorf("Path %s exists and is not a symbolic link created by hvm\nhvm needs your help to resolve this problem; please inspect and move %s", destPath, destPath)
+			return fmt.Errorf("Path %s exists and is not a symbolic link created by hvm.\nhvm needs your help to resolve this problem; please inspect and move %s, thanks.", destPath, destPath)
 		}
 	}
 	// XXX: yarrr

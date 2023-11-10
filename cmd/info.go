@@ -109,7 +109,7 @@ of their popular CLI tools on supported platforms.`,
 
 			// Version info
 			v := map[string]string{}
-			consulV, err := CheckActiveVersion(Consul)
+			consulV, err := ActiveLocalVersion(Consul)
 			if err != nil {
 				logger.Error("info", "cannot determine version", "consul", "error", err.Error())
 			}
@@ -117,7 +117,7 @@ of their popular CLI tools on supported platforms.`,
 				m.CurrentConsulVersion = consulV
 				v["Consul"] = m.CurrentConsulVersion
             }
-			nomadV, err := CheckActiveVersion(Nomad)
+			nomadV, err := ActiveLocalVersion(Nomad)
 			if err != nil {
 				logger.Error("info", "cannot determine version", "nomad", "error", err.Error())
 			}
@@ -125,7 +125,7 @@ of their popular CLI tools on supported platforms.`,
 				m.CurrentNomadVersion = nomadV
 				v["Nomad"] = m.CurrentNomadVersion
             }
-			vaultV, err := CheckActiveVersion(Vault)
+			vaultV, err := ActiveLocalVersion(Vault)
 			if err != nil {
 				logger.Error("info", "cannot determine version", "vault", "error", err.Error())
 			}
